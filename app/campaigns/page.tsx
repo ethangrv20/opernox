@@ -23,6 +23,15 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
@@ -72,7 +81,20 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h3>New Campaign</h3>
-          <button onClick={onClose} className="btn btn-ghost btn-sm"><X size={18} /></button>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              color: '#9b9bad', cursor: 'pointer', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.12)'; (e.target as HTMLElement).style.color = '#fff'; }}
+            onMouseLeave={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; (e.target as HTMLElement).style.color = '#9b9bad'; }}
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {error && <div className="auth-error" style={{ marginBottom: '16px' }}>{error}</div>}
