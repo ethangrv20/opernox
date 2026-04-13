@@ -126,12 +126,63 @@ async function fetchPendingJobs() {
     if (CONFIG.USER_ID) {
       query += `&user_id=eq.${CONFIG.USER_ID}`;
     }
-    
+
     const jobs = await supabaseRequest('GET', query);
     return Array.isArray(jobs) ? jobs : [];
   } catch(e) {
     log('error', 'Failed to fetch pending jobs', { error: e.message });
     return [];
+  }
+}
+
+// ============================================
+// FETCH DUE SCHEDULED POSTS
+// ============================================
+async function fetchDueScheduledPosts() {
+  try {
+    const now = new Date().toISOString();
+    // Posts that are past their scheduled time and still 'scheduled'
+    let query = `scheduled_posts?status=eq.scheduled&scheduled_for=lte.${now}&order=scheduled_for.asc&limit=5`;
+    if (CONFIG.USER_ID) {
+      query += `&user_id=eq.${CONFIG.USER_ID}`;
+    }
+    const posts = await supabaseRequest('GET', query);
+    return Array.isArray(posts) ? posts : [];
+  } catch(e) {
+    log('error', 'Failed to fetch due scheduled posts', { error: e.message });
+    return [];
+  }
+}
+
+// ============================================
+// CREATE A JOB
+// ============================================
+async function createJob(platform, jobType, payload) {
+  const job = {
+    user_id: CONFIG.USER_ID,
+    platform,
+    job_type: jobType,
+    payload,
+    status: 'pending',
+    vps_id: CONFIG.VPS_ID,
+  };
+  return supabaseRequest('POST', 'jobs', job);
+}
+
+// ============================================
+// MARK SCHEDULED POST PUBLISHED
+// ============================================
+async function markScheduledPostPublished(postId, externalId, errorMsg) {
+  try {
+    await supabaseRequest('PATCH', `scheduled_posts?id=eq.${postId}`, {
+      status: errorMsg ? 'failed' : 'published',
+      published_at: new Date().toISOString(),
+      external_id: externalId || null,
+      error: errorMsg || null,
+      updated_at: new Date().toISOString(),
+    });
+  } catch(e) {
+    log('error', 'Failed to update scheduled post', { postId, error: e.message });
   }
 }
 
@@ -335,6 +386,88 @@ async function executeHeyGenJob(jobType, payload, jobId) {
 }
 
 // ============================================
+// CONTENT GENERATION (reads client-config.json on VPS)
+// ============================================
+function getContentEngine() {
+  try {
+    const cePath = path.join(__dirname, '..', '..', '..', 'x-poster', 'content-engine.js');
+    return require(cePath);
+  } catch(e) {
+    log('warn', 'Content engine not found', { error: e.message });
+    return null;
+  }
+}
+
+// ============================================
+// EXECUTE SCHEDULED POST — generate content and post
+// ============================================
+async function executeScheduledPost(spost) {
+  const { id, platform, post_text, user_id } = spost;
+
+  log('info', 'Executing scheduled post', { postId: id, platform });
+
+  // If post_text is provided, use it directly (manual compose)
+  if (post_text && post_text.trim()) {
+    const result = await mcRequest('/api/x/post', 'POST', {
+      text: post_text.trim(),
+      tweetText: post_text.trim(),
+    });
+    if (result.success) {
+      await markScheduledPostPublished(id, result.tweetId, null);
+      await markCompleted(id, { tweetId: result.tweetId, url: result.url });
+    } else {
+      throw new Error(result.error || 'Post failed');
+    }
+    return;
+  }
+
+  // Auto-generate content from client-config.json
+  const ce = getContentEngine();
+  if (!ce) throw new Error('Content engine not available on this VPS');
+
+  // Determine daypart from scheduled time
+  const scheduledDate = new Date(spost.scheduled_for);
+  const hour = scheduledDate.getHours();
+  let daypart;
+  if (hour >= 6 && hour < 12) daypart = 'morning';
+  else if (hour >= 12 && hour < 17) daypart = 'midday';
+  else daypart = 'evening';
+
+  // Validate config (skip TextAscend block by temporarily patching)
+  const { validateConfig } = ce;
+  let generated;
+  let warning = null;
+
+  try {
+    const { warnings } = validateConfig({ name: 'Override', product: 'Override', painPoints: ['a', 'b'], keywords: ['x'], cta: 'Reply X', results: [{ metric: '$0', context: 'test', details: 'x' }], articleTopics: ['topic'] });
+    if (warnings.morning || warnings.midday || warnings.evening) {
+      throw new Error('Client config incomplete');
+    }
+
+    const state = { usedTips: [], usedResults: [], usedTopics: [] };
+    if (daypart === 'morning') generated = ce.generateTip(state);
+    else if (daypart === 'evening') generated = ce.formatEveningResult(state);
+    else generated = ce.generateMidday(state).content;
+  } catch(e) {
+    log('warn', 'Content generation failed', { daypart, error: e.message });
+    throw new Error('Content generation failed — check client config');
+  }
+
+  // Post the generated content
+  const result = await mcRequest('/api/x/post', 'POST', {
+    text: generated,
+    tweetText: generated,
+  });
+
+  if (result.success) {
+    await markScheduledPostPublished(id, result.tweetId, null);
+    await markCompleted(id, { tweetId: result.tweetId, url: result.url });
+  } else {
+    throw new Error(result.error || 'Post failed');
+  }
+}
+
+// ============================================
 // MAIN POLL LOOP
 // ============================================
 let isProcessing = false;
@@ -344,22 +477,35 @@ async function poll() {
     log('debug', 'Skipping poll — still processing previous job');
     return;
   }
-  
+
   try {
+    // 1. Handle explicit jobs first
     const jobs = await fetchPendingJobs();
-    
-    if (jobs.length === 0) {
-      log('debug', 'No pending jobs');
-      return;
+    if (jobs.length > 0) {
+      log('info', `Found ${jobs.length} pending job(s)`);
+      for (const job of jobs) {
+        isProcessing = true;
+        await markRunning(job.id);
+        await executeJob(job);
+        isProcessing = false;
+      }
+      return; // Done with jobs this cycle
     }
-    
-    log('info', `Found ${jobs.length} pending job(s)`);
-    
-    for (const job of jobs) {
-      isProcessing = true;
-      await markRunning(job.id);
-      await executeJob(job);
-      isProcessing = false;
+
+    // 2. Handle due scheduled posts
+    const duePosts = await fetchDueScheduledPosts();
+    if (duePosts.length > 0) {
+      log('info', `Found ${duePosts.length} due scheduled post(s)`);
+      for (const spost of duePosts) {
+        isProcessing = true;
+        try {
+          await executeScheduledPost(spost);
+        } catch(e) {
+          log('error', 'Scheduled post failed', { postId: spost.id, error: e.message });
+          await markScheduledPostPublished(spost.id, null, e.message);
+        }
+        isProcessing = false;
+      }
     }
   } catch(e) {
     isProcessing = false;

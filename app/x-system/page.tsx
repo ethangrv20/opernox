@@ -39,6 +39,7 @@ export default function XSystemPage() {
   const [postText, setPostText] = useState('');
   const [schedulingFor, setSchedulingFor] = useState('');
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isPostingNow, setIsPostingNow] = useState(false);
   const [scheduleMsg, setScheduleMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [tab, setTab] = useState<Tab>('queue');
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
@@ -92,6 +93,26 @@ export default function XSystemPage() {
       .then(({ count }) => setStats(s => ({ ...s, accounts_count: count || 0 })));
   }, [loadPosts]);
 
+  // Post immediately
+  const handlePostNow = async () => {
+    if (!postText.trim()) return;
+    setIsPostingNow(true);
+    const { error } = await supabase.from('scheduled_posts').insert({
+      platform: 'x',
+      post_text: postText.trim(),
+      scheduled_for: new Date().toISOString(),
+      status: 'scheduled',
+    });
+    if (error) {
+      console.error('Post now failed:', error.message);
+    } else {
+      setPostText('');
+      loadPosts();
+    }
+    setIsPostingNow(false);
+    setTimeout(() => setScheduleMsg(null), 3000);
+  };
+
   // Schedule a post
   const handleSchedule = async () => {
     if (!postText.trim()) return;
@@ -119,7 +140,35 @@ export default function XSystemPage() {
     setTimeout(() => setScheduleMsg(null), 3000);
   };
 
-  // Delete a scheduled post
+  // Save auto-post toggle — creates next day's scheduled post entry for that daypart
+  const handleAutoPostToggle = async (key: AutoDaypart) => {
+    const newVal = !autoPost[key];
+    setAutoPost(p => ({ ...p, [key]: newVal }));
+
+    if (newVal) {
+      // Compute next occurrence of this daypart's time (CST = UTC-5/-6)
+      const now = new Date();
+      const offsets: Record<AutoDaypart, { hour: number; min: number }> = {
+        morning: { hour: 7, min: 0 },
+        midday: { hour: 12, min: 0 },
+        evening: { hour: 17, min: 0 },
+      };
+      const { hour, min } = offsets[key];
+      // CST: subtract 6 hours (simplest approximation)
+      let next = new Date(now);
+      next.setHours(hour + 6, min, 0, 0); // convert CST → UTC
+      if (next <= now) next.setDate(next.getDate() + 1);
+
+      const { error } = await supabase.from('scheduled_posts').insert({
+        platform: 'x',
+        post_text: '', // empty = auto-generate via content engine
+        scheduled_for: next.toISOString(),
+        status: 'scheduled',
+      });
+      if (error) console.error('Auto-post toggle failed:', error.message);
+    }
+    // OFF = do nothing for now (can add cancel logic later)
+  };
   const handleDelete = async (id: string) => {
     await supabase.from('scheduled_posts').delete().eq('id', id);
     loadPosts();
@@ -237,6 +286,13 @@ export default function XSystemPage() {
                     />
                   </div>
                 </div>
+                <button
+                  onClick={handlePostNow}
+                  disabled={!isConnected || isPostingNow}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1.5px solid var(--border-2)', cursor: isConnected && !isPostingNow ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', fontFamily: 'inherit', opacity: isPostingNow ? 0.7 : 1 }}
+                >
+                  {isPostingNow ? 'Posting...' : <><Zap size={11} /> Post Now</>}
+                </button>
                 <button
                   onClick={handleSchedule}
                   disabled={!isConnected || isScheduling}
@@ -373,7 +429,7 @@ export default function XSystemPage() {
                         <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>{sub}</div>
                       </div>
                       <button
-                        onClick={() => setAutoPost(p => ({ ...p, [key]: !p[key] }))}
+                        onClick={() => handleAutoPostToggle(key)}
                         style={{ width: 36, height: 20, borderRadius: 99, background: autoPost[key] ? ACCENT : 'var(--surface-3)', position: 'relative', cursor: 'pointer', border: 'none', transition: 'background 0.2s' }}>
                         <div style={{ position: 'absolute', left: autoPost[key] ? 18 : 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
                       </button>
