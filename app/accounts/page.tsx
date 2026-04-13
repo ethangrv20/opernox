@@ -3,29 +3,42 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { IGAccount } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Trash2, Loader2, RefreshCw } from 'lucide-react';
-
+import { Plus, X, Trash2, User } from 'lucide-react';
 
 const WARMUP_SCHEDULE = [5, 8, 12, 16, 20, 25, 30, 40];
 
 function getWarmupInfo(account: IGAccount) {
-  if (!account.warmup_start_date) return { day: 0, limit: 5, label: 'Day 1' };
+  if (!account.warmup_start_date) return { day: 1, limit: 5 };
   const days = Math.floor((Date.now() - new Date(account.warmup_start_date).getTime()) / 86400000);
   const limit = WARMUP_SCHEDULE[Math.min(days, WARMUP_SCHEDULE.length - 1)] || 40;
-  return { day: days + 1, limit, label: `Day ${days + 1}` };
+  return { day: Math.min(days + 1, 40), limit };
+}
+
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button onClick={onClose} aria-label="Close" style={{
+      width: '32px', height: '32px', borderRadius: '9px',
+      background: 'var(--surface3)', border: '1px solid var(--border2)',
+      color: 'var(--text2)', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      transition: 'all 0.15s',
+    }}
+      onMouseEnter={e => { (e.target as HTMLElement).style.background = 'var(--surface4)'; (e.target as HTMLElement).style.color = 'var(--text)'; }}
+      onMouseLeave={e => { (e.target as HTMLElement).style.background = 'var(--surface3)'; (e.target as HTMLElement).style.color = 'var(--text2)'; }}
+    ><X size={15} /></button>
+  );
 }
 
 function AddModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
-  const [form, setForm] = useState({
-    name: '',
-    adspower_id: '',
-    proxy_host: '',
-    proxy_port: '',
-    proxy_user: '',
-    proxy_pass: '',
-  });
+  const [form, setForm] = useState({ name: '', adspower_id: '', proxy_host: '', proxy_port: '', proxy_user: '', proxy_pass: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,30 +62,23 @@ function AddModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
       if (error) throw error;
       onAdded();
       onClose();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <motion.div
-        className="modal"
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <motion.div className="modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
           <h3>Add Account</h3>
-          <button onClick={onClose} className="btn btn-ghost btn-sm"><X size={18} /></button>
+          <CloseButton onClose={onClose} />
         </div>
+        <p className="modal-subtitle">Connect an Instagram AdsPower profile to start outreach.</p>
         {error && <div className="auth-error" style={{ marginBottom: '16px' }}>{error}</div>}
         <form className="modal-form" onSubmit={handleSubmit}>
           <div className="input-group">
             <label>Display name</label>
-            <input className="input" placeholder="Fitness Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+            <input className="input" placeholder="e.g. Fitness Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div className="input-group">
             <label>AdsPower Profile ID</label>
@@ -99,7 +105,7 @@ function AddModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
           <div className="modal-actions">
             <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <div className="spinner" /> : <><Plus size={16} /> Add Account</>}
+              {loading ? <div className="spinner" /> : <><Plus size={14} /> Add Account</>}
             </button>
           </div>
         </form>
@@ -132,24 +138,26 @@ export default function AccountsPage() {
   return (
     <div>
       <div className="topbar">
-        <h2>Accounts</h2>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
-          <Plus size={16} /> Add Account
-        </button>
+        <div className="topbar-left"><h2>Accounts</h2></div>
+        <div className="topbar-right">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
+            <Plus size={15} /> Add Account
+          </button>
+        </div>
       </div>
 
       <div className="page-body">
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
-            <div className="spinner" style={{ width: 32, height: 32 }} />
+            <div className="spinner" style={{ width: 28, height: 28 }} />
           </div>
         ) : accounts.length === 0 ? (
           <div className="empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+            <div className="empty-icon"><User size={24} /></div>
             <h3>No accounts connected</h3>
             <p>Add your first Instagram AdsPower account to start outreach.</p>
             <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-              <Plus size={16} /> Add account
+              <Plus size={15} /> Add account
             </button>
           </div>
         ) : (
@@ -157,45 +165,39 @@ export default function AccountsPage() {
             {accounts.map((a, i) => {
               const wi = getWarmupInfo(a);
               return (
-                <motion.div
-                  key={a.id}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                >
-                  <div className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <motion.div key={a.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                  <div className="account-card">
+                    <div className="account-card-header">
                       <div>
-                        <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>{a.name}</h4>
-                        <div style={{ fontSize: '13px', color: 'var(--text3)' }}>{a.adspower_id}</div>
+                        <div className="account-name">{a.name}</div>
+                        <div className="account-meta">{a.adspower_id}</div>
                       </div>
                       <span className={`badge ${a.status === 'active' ? 'badge-green' : 'badge-gray'}`}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: a.status === 'active' ? 'var(--success)' : 'var(--text3)', display: 'inline-block' }} />
                         {a.status}
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                      <div style={{ padding: '12px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '22px', fontWeight: 800 }}>{wi.label}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>Warmup</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                      <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px' }}>Day {wi.day}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginTop: '2px' }}>Warmup</div>
                       </div>
-                      <div style={{ padding: '12px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '22px', fontWeight: 800 }}>{wi.limit}/day</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>Current Limit</div>
+                      <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px' }}>{wi.limit}/day</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginTop: '2px' }}>Current Limit</div>
                       </div>
                     </div>
 
                     {a.proxy_host && (
-                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '16px' }}>
-                        Proxy: {a.proxy_host}:{a.proxy_port}
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '16px', fontFamily: 'monospace' }}>
+                        {a.proxy_host}:{a.proxy_port}
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--error)' }} onClick={() => deleteAccount(a.id)}>
-                        <Trash2 size={14} /> Remove
-                      </button>
-                    </div>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--error)', width: '100%' }} onClick={() => deleteAccount(a.id)}>
+                      <Trash2 size={13} /> Remove
+                    </button>
                   </div>
                 </motion.div>
               );

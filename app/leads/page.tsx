@@ -3,7 +3,22 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Lead, Campaign } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Upload, Users as UsersIcon, Loader2, Search } from 'lucide-react';
+import { Plus, X, Upload, Users as UsersIcon, Search } from 'lucide-react';
+
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button onClick={onClose} aria-label="Close" style={{
+      width: '32px', height: '32px', borderRadius: '9px',
+      background: 'var(--surface3)', border: '1px solid var(--border2)',
+      color: 'var(--text2)', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      transition: 'all 0.15s',
+    }}
+      onMouseEnter={e => { (e.target as HTMLElement).style.background = 'var(--surface4)'; (e.target as HTMLElement).style.color = 'var(--text)'; }}
+      onMouseLeave={e => { (e.target as HTMLElement).style.background = 'var(--surface3)'; (e.target as HTMLElement).style.color = 'var(--text2)'; }}
+    ><X size={15} /></button>
+  );
+}
 
 function ImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
   const [campaigns, setCampaigns] = useState<{id: string; name: string}[]>([]);
@@ -11,6 +26,12 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
   const [usernames, setUsernames] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -30,66 +51,55 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const names = usernames.split('\n').map(n => n.trim()).filter(Boolean);
       const leads = names.map(name => ({
         user_id: user.id,
-        campaign_id: campaignId,
+        campaign_id: campaignId || null,
         username: name.replace('@', ''),
         status: 'pending' as const,
       }));
-
       const { error } = await supabase.from('leads').insert(leads);
       if (error) throw error;
       onImported();
       onClose();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <motion.div
-        className="modal"
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <motion.div className="modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
           <h3>Import Leads</h3>
-          <button onClick={onClose} className="btn btn-ghost btn-sm"><X size={18} /></button>
+          <CloseButton onClose={onClose} />
         </div>
+        <p className="modal-subtitle">Paste Instagram usernames, one per line.</p>
         {error && <div className="auth-error" style={{ marginBottom: '16px' }}>{error}</div>}
         <form onSubmit={handleImport}>
-          <div className="input-group" style={{ marginBottom: '16px' }}>
-            <label>Campaign</label>
-            <select className="input" value={campaignId} onChange={e => setCampaignId(e.target.value)} required>
-              <option value="">Select campaign...</option>
-              {campaigns.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+          <div className="input-group" style={{ marginBottom: '14px' }}>
+            <label>Campaign (optional)</label>
+            <select className="input" value={campaignId} onChange={e => setCampaignId(e.target.value)}>
+              <option value="">No campaign</option>
+              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div className="input-group">
-            <label>Usernames (one per line)</label>
+          <div className="input-group" style={{ marginBottom: '16px' }}>
+            <label>Usernames</label>
             <textarea
-              style={{ minHeight: '200px', fontFamily: 'monospace', fontSize: '13px' }}
-              placeholder={"alex_smith\nsarah.jones\ndavid健身\n..."}
+              style={{ minHeight: '180px', fontFamily: 'monospace', fontSize: '13px' }}
+              placeholder="alex_smith&#10;sarah.jones&#10;david健身&#10;..."
               value={usernames}
               onChange={e => setUsernames(e.target.value)}
               required
             />
             <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-              Enter Instagram usernames, one per line. Do not include the @ symbol.
+              Enter one username per line. Do not include @.
             </div>
           </div>
-          <div className="modal-actions" style={{ marginTop: '16px' }}>
+          <div className="modal-actions">
             <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <div className="spinner" /> : <><Upload size={16} /> Import</>}
+              {loading ? <div className="spinner" /> : <><Upload size={14} /> Import</>}
             </button>
           </div>
         </form>
@@ -109,11 +119,7 @@ export default function LeadsPage() {
   const fetchLeads = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase
-      .from('leads')
-      .select('*, campaign:campaigns(name)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    const { data } = await supabase.from('leads').select('*, campaign:campaigns(name)').eq('user_id', user.id).order('created_at', { ascending: false });
     setLeads(data || []);
     setLoading(false);
   }, []);
@@ -133,54 +139,52 @@ export default function LeadsPage() {
     return matchStatus && matchSearch;
   });
 
-  const statusColor = (s: string) => {
-    if (s === 'sent') return 'badge-green';
-    if (s === 'replied') return 'badge-purple';
-    if (s === 'escalated') return 'badge-yellow';
-    if (s === 'no_dm_access') return 'badge-red';
-    return 'badge-gray';
-  };
+  const statusColor = (s: string) => ({
+    pending: 'badge-gray', sent: 'badge-green', replied: 'badge-purple',
+    escalated: 'badge-yellow', no_dm_access: 'badge-red',
+  }[s] || 'badge-gray');
 
-  const statusLabel = (s: string) => {
-    if (s === 'no_dm_access') return 'No DM';
-    return s;
-  };
+  const statusLabel = (s: string) => ({
+    pending: 'Pending', sent: 'Sent', replied: 'Replied',
+    escalated: 'Escalated', no_dm_access: 'No DM',
+  }[s] || s);
+
+  const filters = [
+    { key: 'all', label: 'All' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'sent', label: 'Sent' },
+    { key: 'replied', label: 'Replied' },
+    { key: 'escalated', label: 'Escalated' },
+    { key: 'no_dm_access', label: 'No DM' },
+  ];
 
   return (
     <div>
       <div className="topbar">
-        <h2>Leads</h2>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowImport(true)}>
-          <Plus size={16} /> Import Leads
-        </button>
+        <div className="topbar-left"><h2>Leads</h2></div>
+        <div className="topbar-right">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowImport(true)}>
+            <Plus size={15} /> Import Leads
+          </button>
+        </div>
       </div>
 
       <div className="page-body">
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
-            <div className="spinner" style={{ width: 32, height: 32 }} />
+            <div className="spinner" style={{ width: 28, height: 28 }} />
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
-                <input
-                  className="input"
-                  placeholder="Search by username..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{ paddingLeft: '36px' }}
-                />
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
+                <input className="input" placeholder="Search by username..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: '36px' }} />
               </div>
               <div className="tabs">
-                {['all', 'pending', 'sent', 'replied', 'escalated', 'no_dm_access'].map(f => (
-                  <button
-                    key={f}
-                    className={`tab ${filter === f ? 'active' : ''}`}
-                    onClick={() => setFilter(f)}
-                  >
-                    {f === 'all' ? 'All' : f === 'no_dm_access' ? 'No DM' : f.charAt(0).toUpperCase() + f.slice(1)}
+                {filters.map(f => (
+                  <button key={f.key} className={`tab ${filter === f.key ? 'active' : ''}`} onClick={() => setFilter(f.key)}>
+                    {f.label}
                   </button>
                 ))}
               </div>
@@ -188,43 +192,46 @@ export default function LeadsPage() {
 
             {filtered.length === 0 ? (
               <div className="empty-state">
-                <UsersIcon />
+                <div className="empty-icon"><UsersIcon size={24} /></div>
                 <h3>{leads.length === 0 ? 'No leads yet' : 'No matches found'}</h3>
                 <p>{leads.length === 0 ? 'Import leads from a CSV or add them manually to a campaign.' : 'Try a different search or filter.'}</p>
                 {leads.length === 0 && (
                   <button className="btn btn-primary" onClick={() => setShowImport(true)}>
-                    <Upload size={16} /> Import leads
+                    <Upload size={15} /> Import leads
                   </button>
                 )}
               </div>
             ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Username</th>
-                      <th>Campaign</th>
-                      <th>Status</th>
-                      <th>Added</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((l) => (
-                      <tr key={l.id}>
-                        <td style={{ fontWeight: 600, color: 'var(--text)' }}>@{l.username}</td>
-                        <td>{(l as any).campaign?.name || '—'}</td>
-                        <td><span className={`badge ${statusColor(l.status)}`}>{statusLabel(l.status)}</span></td>
-                        <td style={{ color: 'var(--text3)' }}>{new Date(l.created_at).toLocaleDateString()}</td>
+              <>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Campaign</th>
+                        <th>Status</th>
+                        <th>Added</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filtered.map(l => (
+                        <tr key={l.id}>
+                          <td style={{ fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace', fontSize: '13px' }}>
+                            @{l.username}
+                          </td>
+                          <td>{(l as any).campaign?.name || '—'}</td>
+                          <td><span className={`badge ${statusColor(l.status)}`}>{statusLabel(l.status)}</span></td>
+                          <td style={{ color: 'var(--text3)', fontSize: '13px' }}>{new Date(l.created_at).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text3)' }}>
+                  Showing {filtered.length} of {leads.length} leads
+                </div>
+              </>
             )}
-
-            <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text3)' }}>
-              Showing {filtered.length} of {leads.length} leads
-            </div>
           </>
         )}
       </div>

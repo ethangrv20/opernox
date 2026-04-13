@@ -3,13 +3,36 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Campaign, IGAccount } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Plus, Play, Pause, Trash2, Edit3, X, Zap, MessageSquare,
-  ChevronDown, Users as UsersIcon, Loader2
-} from 'lucide-react';
+import { Plus, Play, Pause, Trash2, X, Zap, Users as UsersIcon } from 'lucide-react';
 import Link from 'next/link';
 
-function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (c: Campaign) => void }) {
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      onClick={onClose}
+      aria-label="Close"
+      style={{
+        width: '32px', height: '32px', borderRadius: '9px',
+        background: 'var(--surface3)', border: '1px solid var(--border2)',
+        color: 'var(--text2)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all 0.15s',
+      }}
+      onMouseEnter={e => {
+        (e.target as HTMLElement).style.background = 'var(--surface4)';
+        (e.target as HTMLElement).style.color = 'var(--text)';
+      }}
+      onMouseLeave={e => {
+        (e.target as HTMLElement).style.background = 'var(--surface3)';
+        (e.target as HTMLElement).style.color = 'var(--text2)';
+      }}
+    >
+      <X size={15} />
+    </button>
+  );
+}
+
+function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
     name: '',
     account_id: '',
@@ -23,11 +46,8 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Close on Escape key
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
@@ -50,19 +70,19 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data, error } = await supabase.from('campaigns').insert({
+      const { error } = await supabase.from('campaigns').insert({
         user_id: user.id,
         name: form.name,
-        account_id: form.account_id,
+        account_id: form.account_id || null,
         message_template: form.message_template,
         ai_persona: form.ai_persona,
         goal: form.goal,
         escalation_keywords: form.escalation_keywords.split(',').map(k => k.trim()).filter(Boolean),
         offer_summary: form.offer_summary,
         active: true,
-      }).select().single();
+      });
       if (error) throw error;
-      onCreated(data);
+      onCreated();
       onClose();
     } catch (err: any) {
       setError(err.message);
@@ -77,84 +97,120 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         className="modal"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={(e) => e.stopPropagation()}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
           <h3>New Campaign</h3>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              width: '32px', height: '32px', borderRadius: '8px',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              color: '#9b9bad', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.12)'; (e.target as HTMLElement).style.color = '#fff'; }}
-            onMouseLeave={e => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; (e.target as HTMLElement).style.color = '#9b9bad'; }}
-          >
-            <X size={16} />
-          </button>
+          <CloseButton onClose={onClose} />
         </div>
+        <p className="modal-subtitle">Set up an outreach flow to automate your Instagram DMs.</p>
 
         {error && <div className="auth-error" style={{ marginBottom: '16px' }}>{error}</div>}
 
         <form className="modal-form" onSubmit={handleSubmit}>
           <div className="input-group">
             <label>Campaign name</label>
-            <input className="input" placeholder="Cold Outreach - Fitness Niche" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+            <input className="input" placeholder="e.g. Fitness Niche — Cold Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
 
           <div className="input-group">
             <label>IG Account</label>
-            <select className="input" value={form.account_id} onChange={e => setForm(f => ({ ...f, account_id: e.target.value }))} required>
-              <option value="">Select account...</option>
+            <select className="input" value={form.account_id} onChange={e => setForm(f => ({ ...f, account_id: e.target.value }))}>
+              <option value="">Use any account</option>
               {accounts.map(a => (
-                <option key={a.id} value={a.id}>{a.name} ({a.adspower_id})</option>
+                <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
           </div>
 
           <div className="input-group">
             <label>Message template</label>
-            <textarea
-              value={form.message_template}
-              onChange={e => setForm(f => ({ ...f, message_template: e.target.value }))}
-              style={{ minHeight: '120px' }}
-              required
-            />
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-              Use {'{{name}}'} for the lead&apos;s name
+            <textarea value={form.message_template} onChange={e => setForm(f => ({ ...f, message_template: e.target.value }))} style={{ minHeight: '110px' }} required />
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>Use {'{{name}}'} for the lead&apos;s name</div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="input-group">
+              <label>AI Persona</label>
+              <input className="input" placeholder="Friendly, professional" value={form.ai_persona} onChange={e => setForm(f => ({ ...f, ai_persona: e.target.value }))} />
             </div>
-          </div>
-
-          <div className="input-group">
-            <label>AI Persona / Tone</label>
-            <input className="input" placeholder="Friendly, professional, casual" value={form.ai_persona} onChange={e => setForm(f => ({ ...f, ai_persona: e.target.value }))} />
-          </div>
-
-          <div className="input-group">
-            <label>Goal</label>
-            <input className="input" placeholder="Book a discovery call" value={form.goal} onChange={e => setForm(f => ({ ...f, goal: e.target.value }))} />
+            <div className="input-group">
+              <label>Goal</label>
+              <input className="input" placeholder="Book a call" value={form.goal} onChange={e => setForm(f => ({ ...f, goal: e.target.value }))} />
+            </div>
           </div>
 
           <div className="input-group">
             <label>Escalation keywords</label>
             <input className="input" placeholder="call, meet, schedule, book" value={form.escalation_keywords} onChange={e => setForm(f => ({ ...f, escalation_keywords: e.target.value }))} />
-            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
-              Replies containing these trigger human review
-            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>Replies containing these flag for human review</div>
           </div>
 
           <div className="modal-actions">
             <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <div className="spinner" /> : <><Plus size={16} /> Create</>}
+              {loading ? <div className="spinner" /> : <><Plus size={14} /> Create Campaign</>}
             </button>
           </div>
         </form>
       </motion.div>
     </div>
+  );
+}
+
+function CampaignCard({ c, onToggle, onDelete, fetchCampaigns }: {
+  c: Campaign; onToggle: () => void; onDelete: () => void; fetchCampaigns: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      <div className="campaign-card">
+        <div className="campaign-card-header">
+          <div>
+            <h4>{c.name}</h4>
+            <p>{c.goal || 'No goal set'}</p>
+          </div>
+          <span className={`badge ${c.active ? 'badge-green' : 'badge-gray'}`}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.active ? 'var(--success)' : 'var(--text3)', display: 'inline-block' }} />
+            {c.active ? 'Active' : 'Paused'}
+          </span>
+        </div>
+
+        <div className="campaign-stats">
+          <div className="campaign-stat">
+            <div className="campaign-stat-val">—</div>
+            <div className="campaign-stat-label">Leads</div>
+          </div>
+          <div className="campaign-stat">
+            <div className="campaign-stat-val">—</div>
+            <div className="campaign-stat-label">Sent</div>
+          </div>
+          <div className="campaign-stat">
+            <div className="campaign-stat-val">—</div>
+            <div className="campaign-stat-label">Replies</div>
+          </div>
+        </div>
+
+        <div className="campaign-actions">
+          <button onClick={onToggle} className={`btn ${c.active ? 'btn-secondary' : 'btn-primary'} btn-sm`}>
+            {c.active ? <><Pause size={13} /> Pause</> : <><Play size={13} /> Run</>}
+          </button>
+          <Link href="/leads">
+            <button className="btn btn-ghost btn-sm">
+              <UsersIcon size={13} /> Leads
+            </button>
+          </Link>
+          <button onClick={onDelete} className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--error)' }}>
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -166,11 +222,7 @@ export default function CampaignsPage() {
   const fetchCampaigns = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    const { data } = await supabase.from('campaigns').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
     setCampaigns(data || []);
     setLoading(false);
   }, []);
@@ -191,84 +243,34 @@ export default function CampaignsPage() {
   return (
     <div>
       <div className="topbar">
-        <h2>Campaigns</h2>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-          <Plus size={16} />
-          New Campaign
-        </button>
+        <div className="topbar-left"><h2>Campaigns</h2></div>
+        <div className="topbar-right">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <Plus size={15} /> New Campaign
+          </button>
+        </div>
       </div>
 
       <div className="page-body">
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
-            <div className="spinner" style={{ width: 32, height: 32 }} />
+            <div className="spinner" style={{ width: 28, height: 28 }} />
           </div>
         ) : campaigns.length === 0 ? (
           <div className="empty-state">
-            <MegaphoneIcon />
+            <div className="empty-icon"><Zap size={24} /></div>
             <h3>No campaigns yet</h3>
             <p>Create your first campaign to start reaching your audience.</p>
             <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} />
-              Create campaign
+              <Plus size={15} /> Create campaign
             </button>
           </div>
         ) : (
-          <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+          <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
             {campaigns.map((c, i) => (
-              <motion.div
-                key={c.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06, duration: 0.4 }}
-              >
-                <div className="campaign-card">
-                  <div className="campaign-card-header">
-                    <div>
-                      <h4>{c.name}</h4>
-                      <p>{c.goal || 'No goal set'}</p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                      <span className={`badge ${c.active ? 'badge-green' : 'badge-gray'}`}>
-                        {c.active ? 'Active' : 'Paused'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="campaign-stats">
-                    <div className="campaign-stat">
-                      <div className="campaign-stat-val">—</div>
-                      <div className="campaign-stat-label">Leads</div>
-                    </div>
-                    <div className="campaign-stat">
-                      <div className="campaign-stat-val">—</div>
-                      <div className="campaign-stat-label">Sent</div>
-                    </div>
-                    <div className="campaign-stat">
-                      <div className="campaign-stat-val">—</div>
-                      <div className="campaign-stat-label">Replies</div>
-                    </div>
-                  </div>
-
-                  <div className="campaign-actions">
-                    <button
-                      onClick={() => toggleCampaign(c)}
-                      className={`btn btn-sm ${c.active ? 'btn-secondary' : 'btn-primary'}`}
-                    >
-                      {c.active ? <><Pause size={14} /> Pause</> : <><Play size={14} /> Run</>}
-                    </button>
-                    <Link href="/leads">
-                      <button className="btn btn-ghost btn-sm">
-                        <UsersIcon size={14} />
-                        Leads
-                      </button>
-                    </Link>
-                    <button onClick={() => deleteCampaign(c.id)} className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--error)' }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
+              <div key={c.id} style={{ transitionDelay: `${i * 0.05}s` }}>
+                <CampaignCard c={c} onToggle={() => toggleCampaign(c)} onDelete={() => deleteCampaign(c.id)} fetchCampaigns={fetchCampaigns} />
+              </div>
             ))}
           </div>
         )}
@@ -278,14 +280,5 @@ export default function CampaignsPage() {
         {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={fetchCampaigns} />}
       </AnimatePresence>
     </div>
-  );
-}
-
-function MegaphoneIcon() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m3 11 18-5v12L3 13v-2z"/>
-      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
-    </svg>
   );
 }
