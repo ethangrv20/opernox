@@ -1,0 +1,14 @@
+{
+  "name": "opernox-vps-agent",
+  "version": "1.0.0",
+  "description": "Opernox VPS polling agent — runs automations from Supabase job queue",
+  "main": "job-agent.js",
+  "scripts": {
+    "start": "node job-agent.js",
+    "dev": "node job-agent.js"
+  },
+  "dependencies": {},
+  "node": ">=18",
+  "author": "",
+  "license": "MIT"
+}
