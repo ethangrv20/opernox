@@ -18,13 +18,12 @@ import {
 import { supabase } from '@/lib/supabase';
 
 const NAV_ITEMS = [
-  { href: '/dashboard',   label: 'Overview',    icon: <LayoutDashboard size={16} /> },
-  { href: '/ugc',         label: 'UGC System',   icon: <Video size={16} /> },
-  { href: '/x-system',    label: 'X System',      icon: <Twitter size={16} /> },
-  { href: '/linkedin',    label: 'LinkedIn',      icon: <Linkedin size={16} /> },
-  { href: '/tiktok',      label: 'TikTok',        icon: <Music size={16} /> },
-  { href: '/heygen',      label: 'HeyGen',         icon: <Wand2 size={16} /> },
-  { href: '/outreach',    label: 'IG Outreach',   icon: <Send size={16} /> },
+  { href: '/dashboard',   label: 'Overview',       icon: <LayoutDashboard size={16} /> },
+  { href: '/ugc',         label: 'Instagram UGC',  icon: <Video size={16} /> },
+  { href: '/x-system',    label: 'X System',       icon: <Twitter size={16} /> },
+  { href: '/linkedin',    label: 'LinkedIn',       icon: <Linkedin size={16} /> },
+  { href: '/tiktok',      label: 'TikTok UGC',     icon: <Music size={16} /> },
+  { href: '/outreach',    label: 'IG Outreach',    icon: <Send size={16} /> },
   { href: '/client-config', label: 'Client Config', icon: <Settings size={16} /> },
 ];
 

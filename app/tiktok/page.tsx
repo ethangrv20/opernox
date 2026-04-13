@@ -161,7 +161,7 @@ export default function TikTokPage() {
   return (
     <div>
       <div className="topbar">
-        <div className="topbar-title">TikTok</div>
+        <div className="topbar-title">TikTok UGC</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 12px' }}>
             <CheckCircle size={12} style={{ color: '#10b981' }} />
@@ -175,8 +175,8 @@ export default function TikTokPage() {
 
       <div className="page-content">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Short-Form Video</div>
-          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Upload, schedule, and track your TikTok content</div>
+          <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>HeyGen + TikTok</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Auto-generate UGC videos and post to TikTok — independent from Instagram</div>
         </motion.div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14, alignItems: 'start' }}>
