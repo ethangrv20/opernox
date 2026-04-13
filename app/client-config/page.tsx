@@ -1,126 +1,160 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { Save, Plus, Trash2, CheckCircle, AlertTriangle, ChevronRight } from 'lucide-react';
 
 const ACCENT = '#06b6d4';
+const SECTIONS = [
+  { id: 'basics', label: 'Business Basics' },
+  { id: 'offerings', label: 'Offerings & Pricing' },
+  { id: 'idealClient', label: 'Ideal Client' },
+  { id: 'painPoints', label: 'Pain Points' },
+  { id: 'results', label: 'Client Results' },
+  { id: 'brand', label: 'Brand Voice' },
+  { id: 'market', label: 'Market Context' },
+];
 
-interface ClientConfig {
-  name: string;
-  product: string;
-  cta: string;
-  keywords: string[];
-  painPoints: string[];
-  results: { metric: string; context: string; details: string }[];
-  articleTopics: string[];
-  captions: string[];
+interface Offering { name: string; price: string; description: string; }
+interface Result { metric: string; context: string; details: string; }
+
+function SectionHeader({ label, sub }: { label: string; sub: string }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>{label}</div>
+      {sub && <div style={{ fontSize: '11px', color: 'var(--text-4)', marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
 }
 
-const emptyConfig = (): ClientConfig => ({
-  name: '',
-  product: '',
-  cta: '',
-  keywords: ['', ''],
-  painPoints: ['', ''],
-  results: [{ metric: '', context: '', details: '' }],
-  articleTopics: ['', '', '', '', ''],
-  captions: ['', ''],
-});
+function Field({ label, value, onChange, placeholder, type = 'text', rows = 3 }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; rows?: number;
+}) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>{label}</label>
+      {type === 'textarea'
+        ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6 }} />
+        : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} type={type}
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+      }
+    </div>
+  );
+}
+
+function Card({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px 22px' }}>
+      {children}
+    </motion.div>
+  );
+}
 
 export default function ClientConfigPage() {
-  const [config, setConfig] = useState<ClientConfig>(emptyConfig());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
-  const [validation, setValidation] = useState<{ morning: string | null; midday: string | null; evening: string | null } | null>(null);
+  const [activeSection, setActiveSection] = useState('basics');
 
-  // Load config from server.js
+  // Business basics
+  const [name, setName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [description, setDescription] = useState('');
+
+  // Offerings
+  const [offerings, setOfferings] = useState<Offering[]>([{ name: '', price: '', description: '' }]);
+
+  // Ideal client
+  const [clientWho, setClientWho] = useState('');
+  const [clientWants, setClientWants] = useState('');
+  const [clientStruggles, setClientStruggles] = useState('');
+
+  // Pain points
+  const [painPoints, setPainPoints] = useState<string[]>(['', '', '']);
+
+  // Results
+  const [results, setResults] = useState<Result[]>([{ metric: '', context: '', details: '' }]);
+
+  // Brand voice
+  const [personality, setPersonality] = useState('');
+  const [tone, setTone] = useState('');
+  const [voiceExamples, setVoiceExamples] = useState('');
+
+  // Market
+  const [geography, setGeography] = useState('');
+  const [competitors, setCompetitors] = useState('');
+
   useEffect(() => {
     fetch('http://127.0.0.1:3337/api/client-config')
       .then(r => r.json())
       .then(data => {
-        if (data.client) {
-          setConfig({
-            name: data.client.name || '',
-            product: data.client.product || '',
-            cta: data.client.cta || '',
-            keywords: data.client.keywords || ['', ''],
-            painPoints: data.client.painPoints || ['', ''],
-            results: data.client.results?.length ? data.client.results : [{ metric: '', context: '', details: '' }],
-            articleTopics: data.client.articleTopics?.length ? data.client.articleTopics : ['', '', '', '', ''],
-            captions: data.client.captions || ['', ''],
-          });
-        }
-        // Also load validation if present
-        if (data.validation) setValidation(data.validation);
+        if (!data.client) { setLoading(false); return; }
+        const c = data.client;
+        setName(c.name || '');
+        setOwnerName(c.ownerName || '');
+        setIndustry(c.industry || '');
+        setDescription(c.businessDescription || '');
+        setOfferings(c.offerings?.length ? c.offerings : [{ name: '', price: '', description: '' }]);
+        setClientWho(c.idealClient?.who || '');
+        setClientWants(c.idealClient?.wants || '');
+        setClientStruggles(c.idealClient?.struggles || '');
+        setPainPoints(c.painPoints?.length ? c.painPoints : ['', '', '']);
+        setResults(c.results?.length ? c.results : [{ metric: '', context: '', details: '' }]);
+        setPersonality(c.brandVoice?.personality || '');
+        setTone(c.brandVoice?.tone || '');
+        setVoiceExamples(c.brandVoice?.examples || '');
+        setGeography(c.targetGeography || '');
+        setCompetitors(c.competitors || '');
       })
-      .catch(() => {
-        // Server not reachable — try via Next.js API route instead
-        fetch('/api/client-config')
-          .then(r => r.json())
-          .then(data => {
-            if (data.client) {
-              setConfig({
-                name: data.client.name || '',
-                product: data.client.product || '',
-                cta: data.client.cta || '',
-                keywords: data.client.keywords || ['', ''],
-                painPoints: data.client.painPoints || ['', ''],
-                results: data.client.results?.length ? data.client.results : [{ metric: '', context: '', details: '' }],
-                articleTopics: data.client.articleTopics?.length ? data.client.articleTopics : ['', '', '', '', ''],
-                captions: data.client.captions || ['', ''],
-              });
-            }
-          })
-          .catch(() => {})
-          .finally(() => setLoading(false));
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  const set = (field: keyof ClientConfig, value: unknown) => {
-    setConfig(c => ({ ...c, [field]: value }));
-  };
 
   const save = async () => {
     setSaving(true);
     setMsg(null);
     try {
+      const payload = {
+        client: {
+          name, ownerName, industry, businessDescription: description,
+          offerings: offerings.filter(o => o.name.trim()),
+          idealClient: { who: clientWho, wants: clientWants, struggles: clientStruggles },
+          painPoints: painPoints.filter(p => p.trim()),
+          results: results.filter(r => r.metric.trim() || r.context.trim()),
+          brandVoice: { personality, tone, examples: voiceExamples },
+          targetGeography: geography,
+          competitors,
+        }
+      };
       const res = await fetch('http://127.0.0.1:3337/api/client-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client: config }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
-      setMsg({ type: 'ok', text: 'Config saved!' });
-      // Reload validation
-      const vres = await fetch('http://127.0.0.1:3337/api/client-config/validate').catch(() => null);
-      if (vres?.ok) {
-        const vdata = await vres.json();
-        if (vdata.warnings) setValidation(vdata.warnings);
-      }
+      setMsg({ type: 'ok', text: 'Config saved — systems will generate content automatically.' });
     } catch (e: unknown) {
       const err = e instanceof Error ? e.message : String(e);
       setMsg({ type: 'error', text: err });
     }
     setSaving(false);
-    setTimeout(() => setMsg(null), 4000);
+    setTimeout(() => setMsg(null), 5000);
   };
 
-  const isValid = () => {
-    const c = config;
-    return (
-      c.name.trim() &&
-      c.product.trim() &&
-      c.cta.trim() &&
-      c.keywords[0]?.trim() &&
-      c.painPoints[1]?.trim() &&
-      c.results[0]?.metric?.trim() &&
-      c.results[0]?.context?.trim() &&
-      c.articleTopics.filter(t => t.trim()).length >= 5
-    );
+  const completion = () => {
+    let score = 0;
+    if (name.trim()) score++;
+    if (industry.trim()) score++;
+    if (description.trim()) score++;
+    if (offerings.filter(o => o.name.trim()).length) score++;
+    if (clientWho.trim() && clientStruggles.trim()) score++;
+    if (painPoints.filter(p => p.trim()).length >= 2) score++;
+    if (results.filter(r => r.metric.trim()).length) score++;
+    if (personality.trim() || tone.trim()) score++;
+    return Math.round((score / 8) * 100);
   };
 
   if (loading) {
@@ -131,159 +165,183 @@ export default function ClientConfigPage() {
     );
   }
 
+  const sections = [
+    {
+      id: 'basics', label: 'Business Basics', icon: '01',
+      content: (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ gridColumn: '1/-1' }}><Field label="Business Name" value={name} onChange={setName} placeholder="e.g. Apex Digital Agency" /></div>
+          <Field label="Owner / Founder Name" value={ownerName} onChange={setOwnerName} placeholder="e.g. Sarah Chen" />
+          <Field label="Industry / Niche" value={industry} onChange={setIndustry} placeholder="e.g. Real estate agents, coaches, e-commerce brands" />
+          <div style={{ gridColumn: '1/-1' }}>
+            <Field label="What the Business Does" value={description} onChange={setDescription} placeholder="2-3 sentences describing what you offer and who it's for. Think of it as how you'd explain it to someone at a dinner party." type="textarea" rows={3} />
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'offerings', label: 'Offerings & Pricing', icon: '02',
+      content: (
+        <div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>What do you sell? List each product, service, or package.</div>
+          {offerings.map((o, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 1fr auto', gap: 8, marginBottom: 10, alignItems: 'start' }}>
+              <input value={o.name} onChange={e => { const s = [...offerings]; s[i] = { ...s[i], name: e.target.value }; setOfferings(s); }} placeholder="Offer name (e.g. Done-For-You Content Package)" style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+              <input value={o.price} onChange={e => { const s = [...offerings]; s[i] = { ...s[i], price: e.target.value }; setOfferings(s); }} placeholder="Price (e.g. $2,500/mo)" style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+              <input value={o.description} onChange={e => { const s = [...offerings]; s[i] = { ...s[i], description: e.target.value }; setOfferings(s); }} placeholder="Short description" style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+              <button onClick={() => setOfferings(offerings.filter((_, j) => j !== i))} style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }}><Trash2 size={13} /></button>
+            </div>
+          ))}
+          <button onClick={() => setOfferings([...offerings, { name: '', price: '', description: '' }])} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px dashed var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-3)', fontFamily: 'inherit' }}><Plus size={12} /> Add offering</button>
+        </div>
+      )
+    },
+    {
+      id: 'idealClient', label: 'Ideal Client', icon: '03',
+      content: (
+        <div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>Describe the person who gets the best results from working with you.</div>
+          <Field label="Who They Are" value={clientWho} onChange={setClientWho} placeholder="e.g. Real estate agents with 5+ years experience, doing $500k+ in annual volume, who want to scale without working more hours" type="textarea" rows={3} />
+          <Field label="What They Want" value={clientWants} onChange={setClientWants} placeholder="e.g. More listings, higher commission checks, passive income, systems that run without them" type="textarea" rows={2} />
+          <Field label="What They Struggle With" value={clientStruggles} onChange={setClientStruggles} placeholder="e.g. Spending too much time on manual follow-up, leads going cold, no systematic way to nurture past clients" type="textarea" rows={2} />
+        </div>
+      )
+    },
+    {
+      id: 'painPoints', label: 'Pain Points', icon: '04',
+      content: (
+        <div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>What problems does your offer solve for them? Be specific — these drive the content engine.</div>
+          {painPoints.map((pp, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input value={pp} onChange={e => { const p = [...painPoints]; p[i] = e.target.value; setPainPoints(p); }} placeholder={`Pain point ${i + 1}`} style={{ flex: 1, padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+              {painPoints.length > 2 && <button onClick={() => setPainPoints(painPoints.filter((_, j) => j !== i))} style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }}><Trash2 size={13} /></button>}
+            </div>
+          ))}
+          <button onClick={() => setPainPoints([...painPoints, ''])} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px dashed var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-3)', fontFamily: 'inherit' }}><Plus size={12} /> Add pain point</button>
+        </div>
+      )
+    },
+    {
+      id: 'results', label: 'Client Results', icon: '05',
+      content: (
+        <div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>Real outcomes your clients have gotten. These drive social proof posts. Be specific with numbers.</div>
+          {results.map((r, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8, marginBottom: 10, alignItems: 'start' }}>
+              <input value={r.metric} onChange={e => { const rs = [...results]; rs[i] = { ...rs[i], metric: e.target.value }; setResults(rs); }} placeholder="e.g. $12k in 30 days" style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+              <input value={r.context} onChange={e => { const rs = [...results]; rs[i] = { ...rs[i], context: e.target.value }; setResults(rs); }} placeholder="e.g. recovered from one re-engagement campaign" style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+              <button onClick={() => setResults(results.filter((_, j) => j !== i))} style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }}><Trash2 size={13} /></button>
+            </div>
+          ))}
+          <textarea value={results[0]?.details || ''} onChange={e => { const rs = [...results]; rs[0] = { ...rs[0], details: e.target.value }; setResults(rs); }} placeholder="Proof details (optional) — e.g. Used a 3-text win-back sequence, 47 dormant clients re-engaged" rows={2} style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, marginBottom: 10 }} />
+          <button onClick={() => setResults([...results, { metric: '', context: '', details: '' }])} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 6, border: '1px dashed var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-3)', fontFamily: 'inherit' }}><Plus size={12} /> Add result</button>
+        </div>
+      )
+    },
+    {
+      id: 'brand', label: 'Brand Voice', icon: '06',
+      content: (
+        <div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>How does your business sound when it talks? This shapes all content the system generates.</div>
+          <Field label="Personality Traits" value={personality} onChange={setPersonality} placeholder="e.g. Direct, no BS, straight-talking. Like a mentor who tells you what you need to hear, not what you want to hear." type="textarea" rows={2} />
+          <Field label="Tone" value={tone} onChange={setTone} placeholder="e.g. Conversational, confident, data-driven. Uses numbers and specifics, not vague motivational quotes." type="textarea" rows={2} />
+          <Field label="Example Phrases You've Actually Used" value={voiceExamples} onChange={setVoiceExamples} placeholder="Copy-paste 2-3 real things you've said to clients or posted on social. Even rough versions help." type="textarea" rows={3} />
+        </div>
+      )
+    },
+    {
+      id: 'market', label: 'Market Context', icon: '07',
+      content: (
+        <div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>Where does this business operate? What makes them different?</div>
+          <Field label="Target Geography" value={geography} onChange={setGeography} placeholder="e.g. US and Canada, primarily suburban markets. English-speaking only." type="textarea" rows={2} />
+          <Field label="Competitors or Alternatives" value={competitors} onChange={setCompetitors} placeholder="How do potential clients solve this problem today? What are they doing instead of hiring you? What makes you different?" type="textarea" rows={3} />
+        </div>
+      )
+    },
+  ];
+
+  const current = sections.find(s => s.id === activeSection) || sections[0];
+  const pct = completion();
+
   return (
     <div>
       <div className="topbar">
         <div className="topbar-title">Client Config</div>
-        <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>
-          {isValid()
-            ? <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#10b981' }}><CheckCircle size={12} /> Config complete — auto-post ready</span>
-            : <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-3)' }}><AlertTriangle size={12} /> Complete all fields to enable auto-post</span>
+        <div style={{ fontSize: '12px', color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {pct === 100
+            ? <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#10b981' }}><CheckCircle size={12} /> Config complete</span>
+            : <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><AlertTriangle size={12} /> {pct}% complete</span>
           }
+          <div style={{ width: 80, height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#10b981' : ACCENT, transition: 'width 0.3s' }} />
+          </div>
         </div>
       </div>
 
       <div className="page-content">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Content Generation Settings</div>
-          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>This config drives the auto-post content for Morning, Midday, and Evening posts.</div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Business Intelligence</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Describe the business once. The system generates X posts, UGC scripts, LinkedIn content, outreach, and more — automatically.</div>
         </motion.div>
 
         {msg && (
-          <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: msg.type === 'ok' ? 'rgba(16,185,129,0.08)' : 'rgba(244,63,94,0.08)', border: `1px solid ${msg.type === 'ok' ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'}`, fontSize: '12px', fontWeight: 600, color: msg.type === 'ok' ? '#10b981' : '#f43f5e' }}>
-            {msg.type === 'ok' ? <CheckCircle size={12} style={{ display: 'inline', marginRight: 6 }} /> : <AlertTriangle size={12} style={{ display: 'inline', marginRight: 6 }} />}{msg.text}
+          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 7, background: msg.type === 'ok' ? 'rgba(16,185,129,0.08)' : 'rgba(244,63,94,0.08)', border: `1px solid ${msg.type === 'ok' ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'}`, fontSize: '12.5px', fontWeight: 600, color: msg.type === 'ok' ? '#10b981' : '#f43f5e' }}>
+            {msg.type === 'ok' ? <CheckCircle size={13} style={{ display: 'inline', marginRight: 6 }} /> : <AlertTriangle size={13} style={{ display: 'inline', marginRight: 6 }} />}{msg.text}
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14, alignItems: 'start' }}>
-          {/* Main form */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Identity */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Business Identity</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <label style={{ fontSize: '11.5px', color: 'var(--text-2)', marginBottom: 2 }}>Business / Client Name</label>
-                <input value={config.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Apex Digital" style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                <label style={{ fontSize: '11.5px', color: 'var(--text-2)', marginBottom: 2 }}>Product / Service</label>
-                <input value={config.product} onChange={e => set('product', e.target.value)} placeholder="e.g. Done-for-you content creation for agencies" style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                <label style={{ fontSize: '11.5px', color: 'var(--text-2)', marginBottom: 2 }}>CTA (Call to Action)</label>
-                <input value={config.cta} onChange={e => set('cta', e.target.value)} placeholder="e.g. Reply 'HELLO' and I'll send you the exact sequence" style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-            </motion.div>
-
-            {/* Keywords */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Keywords</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {config.keywords.map((kw, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 6 }}>
-                    <input value={kw} onChange={e => { const k = [...config.keywords]; k[i] = e.target.value; set('keywords', k); }} placeholder={`Keyword ${i + 1}`} style={{ flex: 1, padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                    {config.keywords.length > 1 && <button onClick={() => set('keywords', config.keywords.filter((_, j) => j !== i))} style={{ padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}><Trash2 size={12} /></button>}
-                  </div>
-                ))}
-                <button onClick={() => set('keywords', [...config.keywords, ''])} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-3)', fontFamily: 'inherit' }}><Plus size={11} /> Add keyword</button>
-              </div>
-            </motion.div>
-
-            {/* Pain Points */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Pain Points <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(used in morning tips)</span></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {config.painPoints.map((pp, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 6 }}>
-                    <input value={pp} onChange={e => { const p = [...config.painPoints]; p[i] = e.target.value; set('painPoints', p); }} placeholder={`Pain point ${i + 1}`} style={{ flex: 1, padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                    {config.painPoints.length > 2 && <button onClick={() => set('painPoints', config.painPoints.filter((_, j) => j !== i))} style={{ padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}><Trash2 size={12} /></button>}
-                  </div>
-                ))}
-                <button onClick={() => set('painPoints', [...config.painPoints, ''])} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-3)', fontFamily: 'inherit' }}><Plus size={11} /> Add pain point</button>
-              </div>
-            </motion.div>
-
-            {/* Results */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Client Results <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(used in evening posts)</span></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {config.results.map((r, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
-                    <input value={r.metric} onChange={e => { const rs = [...config.results]; rs[i] = { ...rs[i], metric: e.target.value }; set('results', rs); }} placeholder="e.g. $12k" style={{ padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                    <input value={r.context} onChange={e => { const rs = [...config.results]; rs[i] = { ...rs[i], context: e.target.value }; set('results', rs); }} placeholder="e.g. recovered from one campaign" style={{ padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                  </div>
-                ))}
-                <textarea value={config.results[0]?.details || ''} onChange={e => { const rs = [...config.results]; rs[0] = { ...rs[0], details: e.target.value }; set('results', rs); }} placeholder="Details / proof point" rows={2} style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-            </motion.div>
-
-            {/* Article Topics */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Article Topics <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(min 5 — used in midday posts)</span></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {config.articleTopics.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 6 }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-4)', width: 20, paddingTop: 7 }}>{i + 1}.</span>
-                    <input value={t} onChange={e => { const top = [...config.articleTopics]; top[i] = e.target.value; set('articleTopics', top); }} placeholder={`Topic ${i + 1}`} style={{ flex: 1, padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Captions */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>TikTok Captions <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(used for Reels/video shorts)</span></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {config.captions.map((cap, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 6 }}>
-                    <input value={cap} onChange={e => { const c = [...config.captions]; c[i] = e.target.value; set('captions', c); }} placeholder={`Caption ${i + 1}`} style={{ flex: 1, padding: '7px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: '12.5px', color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                    {config.captions.length > 1 && <button onClick={() => set('captions', config.captions.filter((_, j) => j !== i))} style={{ padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}><Trash2 size={12} /></button>}
-                  </div>
-                ))}
-                <button onClick={() => set('captions', [...config.captions, ''])} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-3)', fontFamily: 'inherit' }}><Plus size={11} /> Add caption</button>
-              </div>
-            </motion.div>
+        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16, alignItems: 'start' }}>
+          {/* Left nav */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {sections.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setActiveSection(s.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 7,
+                  border: '1px solid',
+                  borderColor: activeSection === s.id ? (ACCENT + '44') : 'transparent',
+                  background: activeSection === s.id ? (ACCENT + '0d') : 'transparent',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, color: activeSection === s.id ? ACCENT : 'var(--text-4)', width: 20, flexShrink: 0 }}>{s.icon}</span>
+                <span style={{ fontSize: '12.5px', fontWeight: activeSection === s.id ? 700 : 500, color: activeSection === s.id ? 'var(--text)' : 'var(--text-2)' }}>{s.label}</span>
+                {activeSection === s.id && <ChevronRight size={12} style={{ marginLeft: 'auto', color: ACCENT }} />}
+              </button>
+            ))}
           </div>
 
-          {/* Sidebar — status + save */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 16 }}>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12 }}>Auto-Post Status</div>
-              {[
-                { label: 'Morning Tips', ok: !!(config.painPoints[1]?.trim() && config.keywords[0]?.trim() && config.cta?.trim()) },
-                { label: 'Evening Results', ok: !!(config.results[0]?.metric?.trim() && config.results[0]?.context?.trim()) },
-                { label: 'Midday Articles', ok: !!(config.articleTopics.filter(t => t.trim()).length >= 5) },
-              ].map(item => (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.ok ? '#10b981' : '#f43f5e' }} />
-                  <span style={{ fontSize: '12px', color: 'var(--text-2)' }}>{item.label}</span>
-                </div>
-              ))}
-            </motion.div>
+          {/* Right content */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <Card delay={0.05}>
+              {current.content}
+            </Card>
 
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '18px 16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12 }}>Next Steps</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-3)', lineHeight: 1.6 }}>
-                  1. Complete this form<br />
-                  2. Click Save Config<br />
-                  3. Go to X System → toggle Morning/Midday/Evening ON<br />
-                  4. Agent auto-posts daily
-                </div>
-              </div>
-            </motion.div>
+            {/* Nav buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button
+                onClick={() => { const idx = sections.findIndex(s => s.id === activeSection); if (idx > 0) setActiveSection(sections[idx - 1].id); }}
+                disabled={sections[0].id === activeSection}
+                style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: sections[0].id === activeSection ? 'not-allowed' : 'pointer', fontSize: '12px', color: sections[0].id === activeSection ? 'var(--text-4)' : 'var(--text-2)', fontFamily: 'inherit', opacity: sections[0].id === activeSection ? 0.4 : 1 }}>
+                ← Previous
+              </button>
+              <button
+                onClick={() => { const idx = sections.findIndex(s => s.id === activeSection); if (idx < sections.length - 1) setActiveSection(sections[idx + 1].id); }}
+                disabled={sections[sections.length - 1].id === activeSection}
+                style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: sections[sections.length - 1].id === activeSection ? 'not-allowed' : 'pointer', fontSize: '12px', color: sections[sections.length - 1].id === activeSection ? 'var(--text-4)' : 'var(--text-2)', fontFamily: 'inherit', opacity: sections[sections.length - 1].id === activeSection ? 0.4 : 1 }}>
+                Next →
+              </button>
+            </div>
 
+            {/* Save */}
             <motion.button
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               onClick={save}
               disabled={saving}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 700, color: 'white', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px', borderRadius: 7, background: ACCENT, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 700, color: 'white', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
               <Save size={13} /> {saving ? 'Saving...' : 'Save Config'}
             </motion.button>
           </div>
