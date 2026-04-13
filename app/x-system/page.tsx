@@ -233,7 +233,7 @@ export default function XSystemPage() {
                       value={schedulingFor}
                       onChange={e => setSchedulingFor(e.target.value)}
                       disabled={!isConnected}
-                      style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontSize: '11px', fontFamily: 'inherit', color: 'var(--text-2)' }}
+                      style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-2)', fontSize: '11px', fontFamily: 'inherit' }}
                     />
                   </div>
                 </div>
