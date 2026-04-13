@@ -26,6 +26,8 @@ interface Campaign {
 interface IGAccount {
   id: string;
   username: string;
+  name?: string;
+  adspower_id: string;
   status: string;
   days_active?: number;
   current_daily_limit?: number;
@@ -193,10 +195,10 @@ export default function OutreachPage() {
       const res = await fetch(MC + '/api/ig/browser/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile_id: accounts[0].id }),
+        body: JSON.stringify({ profile_id: accounts[0].adspower_id }),
       });
       const d = await res.json();
-      if (d.success) showToast('ok', 'Browser opened for @' + accounts[0].username);
+      if (d.success) showToast('ok', 'Browser opened for ' + accounts[0].username);
       else showToast('error', d.error || 'Failed to open browser');
     } catch { showToast('error', 'Could not reach MC server'); }
   };
