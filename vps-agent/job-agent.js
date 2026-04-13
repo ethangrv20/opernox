@@ -227,6 +227,7 @@ async function executeXJob(jobType, payload, jobId) {
     // Payload: { text: "tweet content", addCover: true, coverImagePath: "..." }
     const result = await mcRequest('/api/x/post', 'POST', {
       text: payload.text,
+      tweetText: payload.text,
       profileId: payload.profileId || 'k19selk6'
     });
     
