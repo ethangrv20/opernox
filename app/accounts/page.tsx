@@ -7,26 +7,11 @@ import { Plus, X, Trash2, User } from 'lucide-react';
 
 const WARMUP_SCHEDULE = [5, 8, 12, 16, 20, 25, 30, 40];
 
-function getWarmupInfo(account: IGAccount) {
-  if (!account.warmup_start_date) return { day: 1, limit: 5 };
-  const days = Math.floor((Date.now() - new Date(account.warmup_start_date).getTime()) / 86400000);
+function getWarmupInfo(a: IGAccount) {
+  if (!a.warmup_start_date) return { day: 1, limit: 5 };
+  const days = Math.floor((Date.now() - new Date(a.warmup_start_date).getTime()) / 86400000);
   const limit = WARMUP_SCHEDULE[Math.min(days, WARMUP_SCHEDULE.length - 1)] || 40;
   return { day: Math.min(days + 1, 40), limit };
-}
-
-function CloseButton({ onClose }: { onClose: () => void }) {
-  return (
-    <button onClick={onClose} aria-label="Close" style={{
-      width: '32px', height: '32px', borderRadius: '9px',
-      background: 'var(--surface3)', border: '1px solid var(--border2)',
-      color: 'var(--text2)', cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      transition: 'all 0.15s',
-    }}
-      onMouseEnter={e => { (e.target as HTMLElement).style.background = 'var(--surface4)'; (e.target as HTMLElement).style.color = 'var(--text)'; }}
-      onMouseLeave={e => { (e.target as HTMLElement).style.background = 'var(--surface3)'; (e.target as HTMLElement).style.color = 'var(--text2)'; }}
-    ><X size={15} /></button>
-  );
 }
 
 function AddModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
@@ -35,9 +20,9 @@ function AddModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,65 +33,39 @@ function AddModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { error } = await supabase.from('accounts').insert({
-        user_id: user.id,
-        name: form.name,
-        adspower_id: form.adspower_id,
+        user_id: user.id, name: form.name, adspower_id: form.adspower_id,
         proxy_host: form.proxy_host || null,
         proxy_port: form.proxy_port ? parseInt(form.proxy_port) : null,
-        proxy_user: form.proxy_user || null,
-        proxy_pass: form.proxy_pass || null,
-        warmup_start_date: new Date().toISOString(),
-        daily_limit: 5,
-        status: 'active',
+        proxy_user: form.proxy_user || null, proxy_pass: form.proxy_pass || null,
+        warmup_start_date: new Date().toISOString(), daily_limit: 5, status: 'active',
       });
       if (error) throw error;
-      onAdded();
-      onClose();
+      onAdded(); onClose();
     } catch (err: any) { setError(err.message); }
     finally { setLoading(false); }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <motion.div className="modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+      <motion.div className="modal" initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 16 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-hd">
           <h3>Add Account</h3>
-          <CloseButton onClose={onClose} />
+          <button className="modal-close" onClick={onClose} aria-label="Close"><X size={15} /></button>
         </div>
-        <p className="modal-subtitle">Connect an Instagram AdsPower profile to start outreach.</p>
-        {error && <div className="auth-error" style={{ marginBottom: '16px' }}>{error}</div>}
+        <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '22px' }}>Connect an Instagram AdsPower profile to start outreach.</p>
+        {error && <div className="auth-err" style={{ marginBottom: '14px' }}>{error}</div>}
         <form className="modal-form" onSubmit={handleSubmit}>
-          <div className="input-group">
-            <label>Display name</label>
-            <input className="input" placeholder="e.g. Fitness Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+          <div className="field"><label>Display name</label><input className="field-input" placeholder="e.g. Fitness Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
+          <div className="field"><label>AdsPower Profile ID</label><input className="field-input" placeholder="k19selk6" value={form.adspower_id} onChange={e => setForm(f => ({ ...f, adspower_id: e.target.value }))} required /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '11px' }}>
+            <div className="field"><label>Proxy host</label><input className="field-input" placeholder="207.135.197.155" value={form.proxy_host} onChange={e => setForm(f => ({ ...f, proxy_host: e.target.value }))} /></div>
+            <div className="field"><label>Proxy port</label><input className="field-input" placeholder="6096" value={form.proxy_port} onChange={e => setForm(f => ({ ...f, proxy_port: e.target.value }))} /></div>
           </div>
-          <div className="input-group">
-            <label>AdsPower Profile ID</label>
-            <input className="input" placeholder="k19selk6" value={form.adspower_id} onChange={e => setForm(f => ({ ...f, adspower_id: e.target.value }))} required />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="input-group">
-              <label>Proxy host</label>
-              <input className="input" placeholder="207.135.197.155" value={form.proxy_host} onChange={e => setForm(f => ({ ...f, proxy_host: e.target.value }))} />
-            </div>
-            <div className="input-group">
-              <label>Proxy port</label>
-              <input className="input" placeholder="6096" value={form.proxy_port} onChange={e => setForm(f => ({ ...f, proxy_port: e.target.value }))} />
-            </div>
-          </div>
-          <div className="input-group">
-            <label>Proxy username (optional)</label>
-            <input className="input" placeholder="pgtibrkq" value={form.proxy_user} onChange={e => setForm(f => ({ ...f, proxy_user: e.target.value }))} />
-          </div>
-          <div className="input-group">
-            <label>Proxy password (optional)</label>
-            <input className="input" type="password" placeholder="••••••" value={form.proxy_pass} onChange={e => setForm(f => ({ ...f, proxy_pass: e.target.value }))} />
-          </div>
-          <div className="modal-actions">
+          <div className="field"><label>Proxy username</label><input className="field-input" placeholder="Optional" value={form.proxy_user} onChange={e => setForm(f => ({ ...f, proxy_user: e.target.value }))} /></div>
+          <div className="field"><label>Proxy password</label><input className="field-input" type="password" placeholder="Optional" value={form.proxy_pass} onChange={e => setForm(f => ({ ...f, proxy_pass: e.target.value }))} /></div>
+          <div className="modal-foot">
             <button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <div className="spinner" /> : <><Plus size={14} /> Add Account</>}
-            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? <div className="spinner" /> : <><Plus size={14} /> Add Account</>}</button>
           </div>
         </form>
       </motion.div>
@@ -138,66 +97,43 @@ export default function AccountsPage() {
   return (
     <div>
       <div className="topbar">
-        <div className="topbar-left"><h2>Accounts</h2></div>
-        <div className="topbar-right">
-          <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
-            <Plus size={15} /> Add Account
-          </button>
-        </div>
+        <div className="topbar-title">Accounts</div>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><Plus size={14} /> Add Account</button>
       </div>
 
-      <div className="page-body">
+      <div className="page-content">
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}>
-            <div className="spinner" style={{ width: 28, height: 28 }} />
-          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '80px' }}><div className="spinner" style={{ width: 26, height: 26 }} /></div>
         ) : accounts.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon"><User size={24} /></div>
+          <div className="empty">
+            <div className="empty-icon"><User size={22} /></div>
             <h3>No accounts connected</h3>
             <p>Add your first Instagram AdsPower account to start outreach.</p>
-            <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-              <Plus size={15} /> Add account
-            </button>
+            <button className="btn btn-primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add account</button>
           </div>
         ) : (
-          <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '14px' }}>
             {accounts.map((a, i) => {
               const wi = getWarmupInfo(a);
               return (
-                <motion.div key={a.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                  <div className="account-card">
-                    <div className="account-card-header">
+                <motion.div key={a.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+                  <div className="acc-card">
+                    <div className="acc-card-hd">
                       <div>
-                        <div className="account-name">{a.name}</div>
-                        <div className="account-meta">{a.adspower_id}</div>
+                        <div className="acc-name">{a.name}</div>
+                        <div className="acc-meta">{a.adspower_id}</div>
                       </div>
-                      <span className={`badge ${a.status === 'active' ? 'badge-green' : 'badge-gray'}`}>
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: a.status === 'active' ? 'var(--success)' : 'var(--text3)', display: 'inline-block' }} />
+                      <span className={`badge ${a.status === 'active' ? 'badge-g' : 'badge-n'}`}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: a.status === 'active' ? 'var(--green)' : 'var(--text-3)', display: 'inline-block' }} />
                         {a.status}
                       </span>
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                      <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px' }}>Day {wi.day}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginTop: '2px' }}>Warmup</div>
-                      </div>
-                      <div style={{ padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-1px' }}>{wi.limit}/day</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginTop: '2px' }}>Current Limit</div>
-                      </div>
+                    <div className="acc-stats">
+                      <div className="acc-stat"><div className="acc-stat-val" style={{ color: 'var(--violet)' }}>Day {wi.day}</div><div className="acc-stat-lbl">Warmup</div></div>
+                      <div className="acc-stat"><div className="acc-stat-val" style={{ color: 'var(--cyan)' }}>{wi.limit}/day</div><div className="acc-stat-lbl">Current Limit</div></div>
                     </div>
-
-                    {a.proxy_host && (
-                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '16px', fontFamily: 'monospace' }}>
-                        {a.proxy_host}:{a.proxy_port}
-                      </div>
-                    )}
-
-                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--error)', width: '100%' }} onClick={() => deleteAccount(a.id)}>
-                      <Trash2 size={13} /> Remove
-                    </button>
+                    {a.proxy_host && <div style={{ fontSize: '11.5px', color: 'var(--text-3)', marginBottom: '14px', fontFamily: 'monospace' }}>{a.proxy_host}:{a.proxy_port}</div>}
+                    <button className="btn btn-danger btn-sm" style={{ width: '100%' }} onClick={() => deleteAccount(a.id)}><Trash2 size={12} /> Remove</button>
                   </div>
                 </motion.div>
               );
@@ -206,9 +142,7 @@ export default function AccountsPage() {
         )}
       </div>
 
-      <AnimatePresence>
-        {showAdd && <AddModal onClose={() => setShowAdd(false)} onAdded={fetchAccounts} />}
-      </AnimatePresence>
+      <AnimatePresence>{showAdd && <AddModal onClose={() => setShowAdd(false)} onAdded={fetchAccounts} />}</AnimatePresence>
     </div>
   );
 }
