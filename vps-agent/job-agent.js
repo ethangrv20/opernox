@@ -390,10 +390,12 @@ async function executeHeyGenJob(jobType, payload, jobId) {
 // ============================================
 function getContentEngine() {
   try {
-    const cePath = path.join(__dirname, '..', '..', '..', 'x-poster', 'content-engine.js');
+    // From vps-agent: ../../../runtime-workspace/x-poster
+    const cePath = path.join(__dirname, '..', '..', '..', 'runtime-workspace', 'x-poster', 'content-engine.js');
+    log('info', 'Content engine path', { cePath, __dirname });
     return require(cePath);
   } catch(e) {
-    log('warn', 'Content engine not found', { error: e.message });
+    log('warn', 'Content engine not found', { error: e.message, __dirname });
     return null;
   }
 }
@@ -439,7 +441,7 @@ async function executeScheduledPost(spost) {
   let warning = null;
 
   try {
-    const { warnings } = validateConfig({ name: 'Override', product: 'Override', painPoints: ['a', 'b'], keywords: ['x'], cta: 'Reply X', results: [{ metric: '$0', context: 'test', details: 'x' }], articleTopics: ['topic'] });
+    const { warnings } = validateConfig({ name: 'Override', industry: 'Test', painPoints: ['lead follow-up', 'manual outreach'], idealClient: { who: 'test clients', struggles: 'follow-up gap' }, results: [{ metric: '$1', context: 'test context', details: 'test' }], brandVoice: { personality: 'direct', tone: 'test' } });
     if (warnings.morning || warnings.midday || warnings.evening) {
       throw new Error('Client config incomplete');
     }
