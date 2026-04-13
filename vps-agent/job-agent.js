@@ -390,10 +390,10 @@ async function executeHeyGenJob(jobType, payload, jobId) {
 // ============================================
 function getContentEngine() {
   try {
-    // From vps-agent: ../../../runtime-workspace/x-poster
-    const cePath = path.join(__dirname, '..', '..', '..', 'runtime-workspace', 'x-poster', 'content-engine.js');
-    log('info', 'Content engine path', { cePath, __dirname });
-    return require(cePath);
+    const CE_PATH = 'C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\x-poster\\content-engine.js';
+    const STATE_PATH = 'C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\x-poster\\auto-post-state.json';
+    log('info', 'Content engine path', { cePath: CE_PATH, __dirname });
+    return require(CE_PATH);
   } catch(e) {
     log('warn', 'Content engine not found', { error: e.message, __dirname });
     return null;
@@ -404,68 +404,169 @@ function getContentEngine() {
 // EXECUTE SCHEDULED POST — generate content and post
 // ============================================
 async function executeScheduledPost(spost) {
-  const { id, platform, post_text, user_id } = spost;
+  const { id, platform, post_text, user_id, metadata } = spost;
+  const video_path = metadata?.video_path;
 
   log('info', 'Executing scheduled post', { postId: id, platform });
 
   // If post_text is provided, use it directly (manual compose)
   if (post_text && post_text.trim()) {
+    if (platform === 'x') {
+      const result = await mcRequest('/api/x/post', 'POST', {
+        text: post_text.trim(),
+        tweetText: post_text.trim(),
+      });
+      if (result.success) {
+        await markScheduledPostPublished(id, result.tweetId, null);
+        await markCompleted(id, { tweetId: result.tweetId, url: result.url });
+      } else {
+        throw new Error(result.error || 'Post failed');
+      }
+      return;
+    } else if (platform === 'linkedin') {
+      const result = await mcRequest('/api/linkedin/post', 'POST', { text: post_text.trim() });
+      if (result.success) {
+        await markScheduledPostPublished(id, result.postId, null);
+        await markCompleted(id, { postId: result.postId, url: result.url });
+      } else {
+        throw new Error(result.error || 'LinkedIn post failed');
+      }
+      return;
+    } else if (platform === 'tiktok') {
+      if (!video_path) throw new Error('TikTok post requires video_path');
+      const result = await mcRequest('/api/tiktok/post', 'POST', {
+        caption: post_text.trim(),
+        videoPath: video_path,
+      });
+      if (result.success) {
+        await markScheduledPostPublished(id, result.videoId, null);
+        await markCompleted(id, { videoId: result.videoId, url: result.url });
+      } else {
+        throw new Error(result.error || 'TikTok post failed');
+      }
+      return;
+    } else {
+      throw new Error(`Unknown platform in scheduled post: ${platform}`);
+    }
+  }
+
+  // Auto-generate content — only X has content engine
+  if (platform === 'x') {
+    const ce = getContentEngine();
+    if (!ce) throw new Error('Content engine not available on this VPS');
+
+    // Determine daypart from scheduled time
+    const scheduledDate = new Date(spost.scheduled_for);
+    const hour = scheduledDate.getHours();
+    let daypart;
+    if (hour >= 6 && hour < 12) daypart = 'morning';
+    else if (hour >= 12 && hour < 17) daypart = 'midday';
+    else daypart = 'evening';
+
+    // Validate config (skip TextAscend block by temporarily patching)
+    const { validateConfig } = ce;
+    let generated;
+    try {
+      const { warnings } = validateConfig({ name: 'Override', industry: 'Test', painPoints: ['lead follow-up', 'manual outreach'], idealClient: { who: 'test clients', struggles: 'follow-up gap' }, results: [{ metric: '$1', context: 'test context', details: 'test' }], brandVoice: { personality: 'direct', tone: 'test' } });
+      if (warnings.morning || warnings.midday || warnings.evening) {
+        throw new Error('Client config incomplete');
+      }
+
+      const state = { usedTips: [], usedResults: [], usedTopics: [] };
+      if (daypart === 'morning') generated = ce.generateTip(state);
+      else if (daypart === 'evening') generated = ce.formatEveningResult(state);
+      else generated = ce.generateMidday(state).content;
+    } catch(e) {
+      log('warn', 'Content generation failed', { daypart, error: e.message });
+      throw new Error('Content generation failed — check client config');
+    }
+
+    // Post the generated content
     const result = await mcRequest('/api/x/post', 'POST', {
-      text: post_text.trim(),
-      tweetText: post_text.trim(),
+      text: generated,
+      tweetText: generated,
     });
+
     if (result.success) {
       await markScheduledPostPublished(id, result.tweetId, null);
       await markCompleted(id, { tweetId: result.tweetId, url: result.url });
+
+      // Auto-reschedule: if toggle still on for this daypart, create tomorrow's entry
+      await autoReschedule(daypart);
     } else {
       throw new Error(result.error || 'Post failed');
     }
-    return;
-  }
-
-  // Auto-generate content from client-config.json
-  const ce = getContentEngine();
-  if (!ce) throw new Error('Content engine not available on this VPS');
-
-  // Determine daypart from scheduled time
-  const scheduledDate = new Date(spost.scheduled_for);
-  const hour = scheduledDate.getHours();
-  let daypart;
-  if (hour >= 6 && hour < 12) daypart = 'morning';
-  else if (hour >= 12 && hour < 17) daypart = 'midday';
-  else daypart = 'evening';
-
-  // Validate config (skip TextAscend block by temporarily patching)
-  const { validateConfig } = ce;
-  let generated;
-  let warning = null;
-
-  try {
-    const { warnings } = validateConfig({ name: 'Override', industry: 'Test', painPoints: ['lead follow-up', 'manual outreach'], idealClient: { who: 'test clients', struggles: 'follow-up gap' }, results: [{ metric: '$1', context: 'test context', details: 'test' }], brandVoice: { personality: 'direct', tone: 'test' } });
-    if (warnings.morning || warnings.midday || warnings.evening) {
-      throw new Error('Client config incomplete');
-    }
-
-    const state = { usedTips: [], usedResults: [], usedTopics: [] };
-    if (daypart === 'morning') generated = ce.generateTip(state);
-    else if (daypart === 'evening') generated = ce.formatEveningResult(state);
-    else generated = ce.generateMidday(state).content;
-  } catch(e) {
-    log('warn', 'Content generation failed', { daypart, error: e.message });
-    throw new Error('Content generation failed — check client config');
-  }
-
-  // Post the generated content
-  const result = await mcRequest('/api/x/post', 'POST', {
-    text: generated,
-    tweetText: generated,
-  });
-
-  if (result.success) {
-    await markScheduledPostPublished(id, result.tweetId, null);
-    await markCompleted(id, { tweetId: result.tweetId, url: result.url });
   } else {
-    throw new Error(result.error || 'Post failed');
+    throw new Error(`Auto-post not supported for ${platform} — provide post_text`);
+  }
+}
+
+// ============================================
+// AUTO-RESCHEDULE — create tomorrow's entry if toggle still on
+// ============================================
+async function autoReschedule(daypart) {
+  try {
+    const fs = require('fs');
+    const STATE_PATH = 'C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\x-poster\\auto-post-state.json';
+    const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+    if (!state[daypart]) return; // Toggle is OFF, no reschedule
+
+    const offsets = { morning: 14, midday: 19, evening: 0 }; // UTC hour
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(offsets[daypart], 0, 0, 0);
+
+    await supabaseRequest('POST', 'scheduled_posts', {
+      platform: 'x',
+      post_text: '',
+      scheduled_for: tomorrow.toISOString(),
+      status: 'scheduled',
+    });
+    log('info', `Auto-rescheduled ${daypart} for ${tomorrow.toISOString()}`);
+  } catch(e) {
+    log('warn', 'Auto-reschedule failed', { daypart, error: e.message });
+  }
+}
+
+// Also backfill any missing tomorrow rows for active toggles on each poll
+async function backfillMissingRows() {
+  try {
+    const fs = require('fs');
+    const STATE_PATH = 'C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\x-poster\\auto-post-state.json';
+    const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+    const offsets = { morning: 14, midday: 19, evening: 0 };
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const tomorrowEnd = new Date(tomorrow);
+    tomorrowEnd.setHours(23, 59, 59, 999);
+
+    for (const daypart of ['morning', 'midday', 'evening']) {
+      if (!state[daypart]) continue;
+
+      // Check if a scheduled row for tomorrow already exists for this daypart
+      const hr = offsets[daypart];
+      const checkFrom = new Date(tomorrow);
+      checkFrom.setHours(hr, 0, 0, 0);
+      const checkTo = new Date(tomorrow);
+      checkTo.setHours(hr, 5, 0, 0);
+
+      const { data: existing } = await supabaseRequest('GET', 'scheduled_posts?platform=eq.x&status=eq.scheduled&scheduled_for=gte.' + checkFrom.toISOString() + '&scheduled_for=lt.' + checkTo.toISOString() + '&select=id');
+      if (!existing || existing.length === 0) {
+        const target = new Date(tomorrow);
+        target.setHours(hr, 0, 0, 0);
+        await supabaseRequest('POST', 'scheduled_posts', {
+          platform: 'x',
+          post_text: '',
+          scheduled_for: target.toISOString(),
+          status: 'scheduled',
+        });
+        log('info', `Backfill: created missing ${daypart} row for ${target.toISOString()}`);
+      }
+    }
+  } catch(e) {
+    log('warn', 'Backfill failed', { error: e.message });
   }
 }
 
@@ -509,6 +610,9 @@ async function poll() {
         isProcessing = false;
       }
     }
+
+    // 3. Backfill missing tomorrow rows for active toggles
+    await backfillMissingRows();
   } catch(e) {
     isProcessing = false;
     log('error', 'Poll error', { error: e.message });
