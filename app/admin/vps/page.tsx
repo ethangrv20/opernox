@@ -1,9 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 type PaymentStatus = 'pending_wire' | 'paid' | 'vps_approved' | 'vps_active';
-type VPSStatus = 'provisioning' | 'booting' | 'installing' | 'ready' | 'stopped' | 'terminated' | null;
+type VPSStatus = 'provisioning' | 'booting' | 'installing' | 'ready' | 'stopped' | 'terminated';
+
+interface VPS {
+  id: string;
+  user_id: string;
+  hostname: string;
+  ip: string | null;
+  status: VPSStatus | null;
+  location_name: string;
+  os: string;
+  slices: number;
+  ready_at: string | null;
+  created_at: string;
+}
 
 interface Profile {
   id: string;
@@ -14,57 +27,127 @@ interface Profile {
   created_at: string;
 }
 
-interface VPS {
-  id: string;
-  user_id: string;
-  hostname: string;
-  ip: string | null;
-  status: VPSStatus;
-  location_name: string;
-  os: string;
-  slices: number;
-  ready_at: string | null;
-  created_at: string;
-}
-
 type CombinedUser = Profile & { vps?: VPS | null };
 
-// ── Config ───────────────────────────────────────────────────────────────────
+// ── Status Config ────────────────────────────────────────────────────────────
 
-const PAYMENT_CONFIG: Record<PaymentStatus, { label: string; color: string; bg: string; dot: string }> = {
-  pending_wire: { label: 'Pending Wire', color: 'text-amber-400', bg: 'bg-amber-400/10', dot: 'bg-amber-400' },
-  paid:         { label: 'Wire Received', color: 'text-emerald-400', bg: 'bg-emerald-400/10', dot: 'bg-emerald-400' },
-  vps_approved: { label: 'Provisioning', color: 'text-blue-400', bg: 'bg-blue-400/10', dot: 'bg-blue-400 animate-pulse' },
-  vps_active:   { label: 'VPS Active',  color: 'text-green-400', bg: 'bg-green-400/10', dot: 'bg-green-400' },
+const STATUS_META: Record<PaymentStatus, { label: string; cls: string }> = {
+  pending_wire: { label: 'Pending Wire',  cls: 'status-amber' },
+  paid:         { label: 'Wire Received', cls: 'status-green' },
+  vps_approved: { label: 'Provisioning',  cls: 'status-blue' },
+  vps_active:   { label: 'VPS Active',    cls: 'status-live' },
 };
 
-const VPS_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  provisioning: { label: '⏳ Provisioning', color: 'text-yellow-400' },
-  booting:      { label: '🔧 Booting',      color: 'text-blue-400' },
-  installing:   { label: '⚙️ Installing',   color: 'text-purple-400' },
-  ready:        { label: '✅ Live',          color: 'text-green-400' },
-  stopped:      { label: '⏸ Stopped',        color: 'text-gray-400' },
-  terminated:   { label: '❌ Terminated',   color: 'text-red-400' },
+const VPS_META: Record<string, { label: string; cls: string }> = {
+  provisioning: { label: 'Provisioning…', cls: 'vps-pending' },
+  booting:      { label: 'Booting…',     cls: 'vps-pending' },
+  installing:   { label: 'Installing…',  cls: 'vps-pending' },
+  ready:        { label: 'Live',         cls: 'vps-live' },
+  stopped:      { label: 'Stopped',      cls: 'vps-stopped' },
+  terminated:   { label: 'Terminated',   cls: 'vps-dead' },
 };
 
-// ── Components ────────────────────────────────────────────────────────────────
+// ── Card Component ───────────────────────────────────────────────────────────
 
-function StatusPill({ status }: { status: PaymentStatus }) {
-  const c = PAYMENT_CONFIG[status];
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${c.bg} ${c.color}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-      {c.label}
-    </span>
-  );
-}
+function UserCard({
+  user,
+  isSelected,
+  onSelect,
+  onAction,
+  actionLoading,
+  confirmingId,
+  onConfirmYes,
+  onConfirmNo,
+}: {
+  user: CombinedUser;
+  isSelected: boolean;
+  onSelect: () => void;
+  onAction: (action: string) => void;
+  actionLoading: string | null;
+  confirmingId: string | null;
+  onConfirmYes: () => void;
+  onConfirmNo: () => void;
+}) {
+  const meta = STATUS_META[user.payment_status];
+  const vpsMeta = user.vps ? (VPS_META[user.vps.status || ''] || { label: user.vps.status, cls: 'vps-unknown' }) : null;
 
-function VPSTag({ vps }: { vps: VPS }) {
-  const s = VPS_STATUS_CONFIG[vps.status || ''] || { label: vps.status, color: 'text-gray-400' };
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className={`text-xs font-medium ${s.color}`}>{s.label}</span>
-      {vps.ip && <span className="text-xs font-mono text-cyan-400/70">{vps.ip}</span>}
+    <div
+      onClick={onSelect}
+      className={`vps-card ${isSelected ? 'vps-card--selected' : ''}`}
+    >
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="vps-card__name">{user.business_name || '—'}</div>
+          <div className="vps-card__email">{user.email}</div>
+        </div>
+        <span className={`status-pill ${meta.cls}`}>{meta.label}</span>
+      </div>
+
+      {/* VPS info */}
+      <div className="mt-3 flex items-center gap-3">
+        {user.vps ? (
+          <>
+            <span className={`vps-badge ${vpsMeta?.cls}`}>{vpsMeta?.label}</span>
+            {user.vps.ip && <span className="vps-ip">{user.vps.ip}</span>}
+          </>
+        ) : (
+          <span className="vps-none">No VPS</span>
+        )}
+      </div>
+
+      {/* Expanded actions */}
+      {isSelected && (
+        <div className="vps-card__actions" onClick={e => e.stopPropagation()}>
+          <div className="vps-card__divider" />
+
+          {user.payment_status === 'pending_wire' && (
+            <button
+              className="btn-primary"
+              disabled={!!actionLoading}
+              onClick={() => onAction('paid')}
+            >
+              {actionLoading === user.id ? '…' : '✓ Mark Wire Received'}
+            </button>
+          )}
+
+          {user.payment_status === 'paid' && (
+            <>
+              <button
+                className="btn-primary"
+                disabled={!!actionLoading}
+                onClick={() => onAction('provision')}
+              >
+                {actionLoading === user.id ? '…' : '🔧 Provision VPS — $40/mo'}
+              </button>
+              {confirmingId === user.id && (
+                <div className="confirm-box">
+                  <span className="confirm-text">Order real VPS on Interserver?</span>
+                  <div className="confirm-btns">
+                    <button className="btn-danger" onClick={onConfirmYes}>YES — Order</button>
+                    <button className="btn-ghost" onClick={onConfirmNo}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {user.payment_status === 'vps_approved' && (
+            <div className="vps-status-msg">⏳ Provisioning in progress…</div>
+          )}
+
+          {user.vps?.status === 'ready' && (
+            <button
+              className="btn-danger-ghost"
+              disabled={!!actionLoading}
+              onClick={() => onAction('terminate')}
+            >
+              ⛔ Terminate VPS
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -74,332 +157,271 @@ function VPSTag({ vps }: { vps: VPS }) {
 export default function AdminVPSPage() {
   const [users, setUsers] = useState<CombinedUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
-  const [notesEditing, setNotesEditing] = useState<string | null>(null);
-  const [notesDraft, setNotesDraft] = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedUser, setSelectedUser] = useState<CombinedUser | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const refreshKey = useRef(0);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (attempt = 1) => {
     try {
       const [profilesRes, vpsesRes] = await Promise.all([
         fetch('/api/admin/profiles', { credentials: 'include' }),
         fetch('/api/admin/vpses', { credentials: 'include' }),
       ]);
-      if (!profilesRes.ok) throw new Error('Failed to load');
-      const profiles: Profile[] = await profilesRes.json();
+
+      const profiles: Profile[] = profilesRes.ok ? await profilesRes.json() : [];
       const vpses: VPS[] = vpsesRes.ok ? await vpsesRes.json() : [];
+
       const vpsMap: Record<string, VPS> = {};
       vpses.forEach(v => { vpsMap[v.user_id] = v; });
+
       const order: PaymentStatus[] = ['pending_wire', 'paid', 'vps_approved', 'vps_active'];
       const combined: CombinedUser[] = profiles
         .map(p => ({ ...p, vps: vpsMap[p.id] || null }))
         .sort((a, b) => order.indexOf(a.payment_status) - order.indexOf(b.payment_status));
+
       setUsers(combined);
-    } catch (e) {
-      console.error(e);
+      setError(null);
+    } catch (err) {
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000));
+        return fetchData(attempt + 1);
+      }
+      setError('Failed to load data.');
     } finally {
       setLoading(false);
     }
-  }, [refreshKey]);
+  }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Auto-refresh every 20s when VPSes are provisioning
   useEffect(() => {
     const pending = users.some(u => u.vps && ['provisioning','booting','installing'].includes(u.vps.status!));
     if (!pending) return;
-    const t = setInterval(() => setRefreshKey(k => k + 1), 20000);
+    const t = setInterval(() => { refreshKey.current++; fetchData(); }, 20000);
     return () => clearInterval(t);
-  }, [users]);
+  }, [users, fetchData]);
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  async function handleAction(userId: string, action: string) {
+    setErrorMsg(null);
+    if (action === 'paid') {
+      setActionLoading(userId);
+      try {
+        const res = await fetch(`/api/admin/profiles/${userId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_status: 'paid' }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        setSelectedId(null);
+        fetchData();
+      } catch (e: any) {
+        setErrorMsg(e.message);
+      } finally {
+        setActionLoading(null);
+      }
+      return;
+    }
 
-  async function handleMarkPaid(userId: string) {
-    setActionLoading(userId);
-    try {
-      await fetch(`/api/admin/profiles/${userId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payment_status: 'paid' }),
-      });
-      setRefreshKey(k => k + 1);
-    } finally {
-      setActionLoading(null);
+    if (action === 'provision') {
+      setConfirmingId(userId);
+      return;
+    }
+
+    if (action === 'terminate') {
+      if (!confirm('Terminate this VPS? This cannot be undone.')) return;
+      setActionLoading(userId + '-t');
+      try {
+        await fetch(`/api/admin/vpses/${users.find(u => u.id === userId)!.vps!.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        setSelectedId(null);
+        fetchData();
+      } finally {
+        setActionLoading(null);
+      }
     }
   }
 
-  async function handleApproveVPS(user: CombinedUser) {
-    setConfirmingUserId(null);
-    setActionLoading(user.id);
+  async function handleConfirmProvision(userId: string) {
+    setConfirmingId(null);
+    setActionLoading(userId);
     try {
       const res = await fetch(`/api/admin/vpses/provision`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id }),
+        body: JSON.stringify({ user_id: userId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Provisioning failed');
-      setSelectedUser(null);
-      setRefreshKey(k => k + 1);
-    } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      setSelectedId(null);
+      fetchData();
+    } catch (e: any) {
+      setErrorMsg(e.message);
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleTerminateVPS(user: CombinedUser) {
-    if (!confirm(`Terminate VPS for ${user.email}? This cannot be undone.`)) return;
-    setActionLoading(user.id + '-t');
-    try {
-      await fetch(`/api/admin/vpses/${user.vps!.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      setSelectedUser(null);
-      setRefreshKey(k => k + 1);
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleSaveNotes(user: CombinedUser) {
-    await fetch(`/api/admin/profiles/${user.id}`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wire_notes: notesDraft }),
-    });
-    setNotesEditing(null);
-    setRefreshKey(k => k + 1);
-  }
-
-  // ── Stats ───────────────────────────────────────────────────────────────────
-
-  const stats = {
-    total: users.length,
-    pendingWire: users.filter(u => u.payment_status === 'pending_wire').length,
-    paid: users.filter(u => u.payment_status === 'paid').length,
-    vpsActive: users.filter(u => u.vps?.status === 'ready').length,
-    vpsProvisioning: users.filter(u => u.payment_status === 'vps_approved').length,
-  };
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Stats
+  const pending = users.filter(u => u.payment_status === 'pending_wire').length;
+  const paid = users.filter(u => u.payment_status === 'paid').length;
+  const provisioning = users.filter(u => u.payment_status === 'vps_approved').length;
+  const live = users.filter(u => u.vps?.status === 'ready').length;
 
   return (
-    <div className="space-y-5">
+    <div className="vps-admin">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="vps-admin__header">
         <div>
-          <h1 className="text-xl font-bold text-white">VPS Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {stats.total} users · {stats.vpsActive} VPS active · {stats.pendingWire} pending wire
+          <h1 className="vps-admin__title">VPS Management</h1>
+          <p className="vps-admin__sub">
+            {users.length} users · {live} active · refreshes every 20s during provisioning
           </p>
         </div>
-        <button
-          onClick={() => setRefreshKey(k => k + 1)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 rounded-lg transition-colors"
-        >
-          ↻ Refresh
-        </button>
-      </div>
-
-      {/* Stats bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Pending Wire', value: stats.pendingWire, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-          { label: 'Wire Received', value: stats.paid, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-          { label: 'Provisioning', value: stats.vpsProvisioning, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-          { label: 'VPS Live', value: stats.vpsActive, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
-        ].map(s => (
-          <div key={s.label} className={`rounded-xl border p-4 ${s.bg}`}>
-            <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Two-column layout: table + detail panel */}
-      <div className="flex gap-5" style={{ alignItems: 'flex-start' }}>
-
-        {/* User table */}
-        <div className="flex-1 bg-white/5 rounded-xl border border-white/10 overflow-hidden min-w-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/5 text-left">
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">VPS</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Signed Up</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-12 text-center text-gray-600">No users yet.</td></tr>
-              )}
-              {users.map(user => {
-                const isSelected = selectedUser?.id === user.id;
-                return (
-                  <tr
-                    key={user.id}
-                    onClick={() => setSelectedUser(isSelected ? null : user)}
-                    className={`border-b border-white/5 cursor-pointer transition-colors ${isSelected ? 'bg-cyan-500/10' : 'hover:bg-white/[0.02]'}`}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-white text-sm">{user.business_name || '—'}</div>
-                      <div className="text-xs text-gray-500 truncate max-w-32">{user.email}</div>
-                    </td>
-                    <td className="px-4 py-3"><StatusPill status={user.payment_status} /></td>
-                    <td className="px-4 py-3">
-                      {user.vps ? (
-                        <VPSTag vps={user.vps} />
-                      ) : (
-                        <span className="text-xs text-gray-600">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-3">
+          {errorMsg && <span className="text-xs text-red-400">{errorMsg}</span>}
+          <button
+            className="btn-ghost"
+            onClick={() => fetchData()}
+            disabled={loading}
+          >
+            ↻ Refresh
+          </button>
         </div>
-
-        {/* Detail panel */}
-        {selectedUser && (
-          <div className="w-80 shrink-0 bg-white/5 rounded-xl border border-cyan-500/30 overflow-hidden" style={{ position: 'sticky', top: 0 }}>
-            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">Client Details</h2>
-              <button onClick={() => setSelectedUser(null)} className="text-gray-500 hover:text-white text-lg">×</button>
-            </div>
-            <div className="p-4 space-y-4">
-
-              {/* Info */}
-              <div className="space-y-1.5">
-                <div>
-                  <div className="text-xs text-gray-500">Business</div>
-                  <div className="text-sm text-white font-medium">{selectedUser.business_name || '—'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Email</div>
-                  <div className="text-sm text-white">{selectedUser.email}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Status</div>
-                  <div className="mt-1"><StatusPill status={selectedUser.payment_status} /></div>
-                </div>
-                {selectedUser.vps && (
-                  <div>
-                    <div className="text-xs text-gray-500">VPS</div>
-                    <div className="text-sm text-white font-mono">{selectedUser.vps.hostname}</div>
-                    {selectedUser.vps.ip && <div className="text-xs text-cyan-400 font-mono">{selectedUser.vps.ip}</div>}
-                    <div className="text-xs text-gray-500 mt-0.5">{selectedUser.vps.location_name} · {selectedUser.vps.os} · {selectedUser.vps.slices} slices</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Wire notes */}
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Wire Notes</div>
-                {notesEditing === selectedUser.id ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={notesDraft}
-                      onChange={e => setNotesDraft(e.target.value)}
-                      rows={3}
-                      className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 resize-none focus:outline-none focus:border-cyan-500/50"
-                      placeholder="e.g. $347 received Apr 13, Chase ref #..."
-                    />
-                    <div className="flex gap-2">
-                      <button onClick={() => handleSaveNotes(selectedUser)} className="flex-1 py-1.5 text-xs bg-cyan-500 hover:bg-cyan-400 text-black font-medium rounded-lg">Save</button>
-                      <button onClick={() => setNotesEditing(null)} className="flex-1 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => { setNotesEditing(selectedUser.id); setNotesDraft(selectedUser.wire_notes || ''); }}
-                    className="text-xs text-gray-400 bg-black/20 border border-dashed border-white/10 rounded-lg px-3 py-2 cursor-pointer hover:border-white/20 min-h-[40px] flex items-center"
-                  >
-                    {selectedUser.wire_notes || 'Click to add notes...'}
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="space-y-2 pt-2 border-t border-white/5">
-                {selectedUser.payment_status === 'pending_wire' && (
-                  <button
-                    onClick={() => handleMarkPaid(selectedUser.id)}
-                    disabled={!!actionLoading}
-                    className="w-full py-2.5 text-sm font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {actionLoading === selectedUser.id ? '...' : '✓ Mark Wire Received'}
-                  </button>
-                )}
-                {selectedUser.payment_status === 'paid' && (
-                  <>
-                    <button
-                      onClick={() => setConfirmingUserId(selectedUser.id)}
-                      disabled={!!actionLoading}
-                      className="w-full py-2.5 text-sm font-semibold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {actionLoading === selectedUser.id ? '...' : '🔧 Provision VPS — $40/mo'}
-                    </button>
-                    {confirmingUserId === selectedUser.id && (
-                      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 space-y-2">
-                        <p className="text-xs text-yellow-300">This will order a real VPS on Interserver. Confirm?</p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleApproveVPS(selectedUser)}
-                            className="flex-1 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-500 text-white rounded-lg"
-                          >
-                            YES — Order
-                          </button>
-                          <button
-                            onClick={() => setConfirmingUserId(null)}
-                            className="flex-1 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-                {selectedUser.payment_status === 'vps_approved' && (
-                  <div className="py-2.5 text-sm text-blue-400 text-center">
-                    ⏳ Provisioning in progress...
-                  </div>
-                )}
-                {selectedUser.vps?.status === 'ready' && (
-                  <button
-                    onClick={() => handleTerminateVPS(selectedUser)}
-                    disabled={!!actionLoading}
-                    className="w-full py-2.5 text-sm font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {actionLoading === selectedUser.id + '-t' ? '...' : '⛔ Terminate VPS'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
+
+      {/* Stats */}
+      <div className="vps-stats">
+        <div className="vps-stat vps-stat--amber">
+          <span className="vps-stat__num">{pending}</span>
+          <span className="vps-stat__label">Pending Wire</span>
+        </div>
+        <div className="vps-stat vps-stat--green">
+          <span className="vps-stat__num">{paid}</span>
+          <span className="vps-stat__label">Wire Received</span>
+        </div>
+        <div className="vps-stat vps-stat--blue">
+          <span className="vps-stat__num">{provisioning}</span>
+          <span className="vps-stat__label">Provisioning</span>
+        </div>
+        <div className="vps-stat vps-stat--live">
+          <span className="vps-stat__num">{live}</span>
+          <span className="vps-stat__label">VPS Live</span>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="vps-loading">
+          <div className="spinner-lg" />
+        </div>
+      ) : error ? (
+        <div className="vps-error">{error} <button className="btn-ghost text-xs" onClick={() => fetchData()}>Retry</button></div>
+      ) : users.length === 0 ? (
+        <div className="vps-empty">
+          <div className="vps-empty__icon">📦</div>
+          <div className="vps-empty__title">No users yet</div>
+          <div className="vps-empty__sub">Users will appear here once they sign up</div>
+        </div>
+      ) : (
+        <div className="vps-grid">
+          {users.map(user => (
+            <UserCard
+              key={user.id}
+              user={user}
+              isSelected={selectedId === user.id}
+              onSelect={() => setSelectedId(selectedId === user.id ? null : user.id)}
+              onAction={(a) => handleAction(user.id, a)}
+              actionLoading={actionLoading}
+              confirmingId={confirmingId}
+              onConfirmYes={() => handleConfirmProvision(user.id)}
+              onConfirmNo={() => setConfirmingId(null)}
+            />
+          ))}
+        </div>
+      )}
+
+      <style>{`
+        .vps-admin { padding: 28px 32px; max-width: 1200px; }
+        .vps-admin__header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+        .vps-admin__title { font-size: 22px; font-weight: 700; color: #f3f4f6; margin: 0; }
+        .vps-admin__sub { font-size: 13px; color: #6b7280; margin: 4px 0 0; }
+
+        .vps-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+        .vps-stat { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 16px 20px; }
+        .vps-stat__num { display: block; font-size: 28px; font-weight: 700; line-height: 1; }
+        .vps-stat__label { display: block; font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .vps-stat--amber .vps-stat__num { color: #fbbf24; }
+        .vps-stat--green .vps-stat__num { color: #34d399; }
+        .vps-stat--blue .vps-stat__num { color: #60a5fa; }
+        .vps-stat--live .vps-stat__num { color: #4ade80; }
+
+        .vps-loading { display: flex; align-items: center; justify-content: center; height: 200px; }
+        .spinner-lg { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #22d3ee; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .vps-error { text-align: center; padding: 48px; color: #f87171; font-size: 14px; }
+
+        .vps-empty { text-align: center; padding: 64px 32px; }
+        .vps-empty__icon { font-size: 40px; margin-bottom: 12px; }
+        .vps-empty__title { font-size: 16px; font-weight: 600; color: #d1d5db; }
+        .vps-empty__sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
+
+        .vps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+
+        .vps-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px 20px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; }
+        .vps-card:hover { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); }
+        .vps-card--selected { border-color: rgba(34,211,238,0.4); background: rgba(34,211,238,0.05); }
+
+        .vps-card__name { font-size: 14px; font-weight: 600; color: #f3f4f6; }
+        .vps-card__email { font-size: 12px; color: #6b7280; margin-top: 2px; font-family: monospace; }
+
+        .status-pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+        .status-amber { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+        .status-green { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+        .status-blue { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.25); }
+        .status-live { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+
+        .vps-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+        .vps-pending { background: rgba(251,191,36,0.1); color: #fbbf24; }
+        .vps-live { background: rgba(74,222,128,0.1); color: #4ade80; }
+        .vps-stopped { background: rgba(107,114,128,0.15); color: #9ca3af; }
+        .vps-dead { background: rgba(248,113,113,0.1); color: #f87171; }
+        .vps-unknown { background: rgba(107,114,128,0.15); color: #9ca3af; }
+        .vps-ip { font-size: 11px; color: #22d3ee; font-family: monospace; }
+        .vps-none { font-size: 12px; color: #4b5563; }
+
+        .vps-card__divider { height: 1px; background: rgba(255,255,255,0.06); margin: 14px 0; }
+        .vps-card__actions { }
+        .vps-card__actions .btn-primary { width: 100%; }
+        .vps-status-msg { text-align: center; font-size: 13px; color: #60a5fa; padding: 4px 0; }
+
+        .confirm-box { margin-top: 10px; background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.2); border-radius: 10px; padding: 12px 14px; }
+        .confirm-text { font-size: 12px; color: #fbbf24; display: block; margin-bottom: 10px; }
+        .confirm-btns { display: flex; gap: 8px; }
+        .confirm-btns .btn-danger { flex: 1; padding: 7px 0; font-size: 12px; }
+
+        .btn-primary { background: #22d3ee; color: #000; font-weight: 700; font-size: 13px; padding: 9px 18px; border-radius: 9px; border: none; cursor: pointer; transition: background 0.15s; }
+        .btn-primary:hover:not(:disabled) { background: #67e8f9; }
+        .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-danger { background: #dc2626; color: #fff; font-weight: 700; font-size: 13px; padding: 9px 18px; border-radius: 9px; border: none; cursor: pointer; transition: background 0.15s; }
+        .btn-danger:hover:not(:disabled) { background: #ef4444; }
+        .btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-danger-ghost { background: rgba(220,38,38,0.1); color: #f87171; font-weight: 600; font-size: 13px; padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(220,38,38,0.2); cursor: pointer; width: 100%; transition: all 0.15s; }
+        .btn-danger-ghost:hover:not(:disabled) { background: rgba(220,38,38,0.2); }
+        .btn-danger-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-ghost { background: rgba(255,255,255,0.06); color: #9ca3af; font-weight: 500; font-size: 13px; padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.15s; }
+        .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: #d1d5db; }
+        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+      `}</style>
     </div>
   );
 }
