@@ -1,12 +1,220 @@
 'use client';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Send, MessageSquare, Users, TrendingUp, Plug, Plus } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, MessageSquare, Users, TrendingUp, Plug, Plus, Play, Pause, Trash2, X, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 
 const ACCENT = '#ec4899';
+const MC = 'http://127.0.0.1:3337';
+
+interface Campaign {
+  id: string;
+  name: string;
+  account_id: string;
+  message_template: string;
+  ai_persona: string;
+  goal: string;
+  escalation_keywords: string[];
+  offer_summary: string;
+  active: boolean;
+  created: string;
+  dms_sent?: number;
+  leads_total?: number;
+  leads_contacted?: number;
+  replies_received?: number;
+}
+
+interface IGAccount {
+  id: string;
+  username: string;
+  status: string;
+  days_active?: number;
+  current_daily_limit?: number;
+}
+
+interface Lead {
+  id: string;
+  username: string;
+  campaign_id: string;
+  status: 'pending' | 'sent' | 'replied' | 'escalated' | 'failed';
+  source: string;
+  added_at: string;
+}
+
+interface Reply {
+  id: string;
+  campaign_id: string;
+  username: string;
+  message: string;
+  timestamp: string;
+  escalated: boolean;
+}
+
+interface Stats {
+  total_sent: number;
+  sent_today: number;
+  accounts: number;
+}
 
 export default function OutreachPage() {
   const [tab, setTab] = useState<'campaigns' | 'leads' | 'analytics'>('campaigns');
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [accounts, setAccounts] = useState<IGAccount[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [stats, setStats] = useState<Stats>({ total_sent: 0, sent_today: 0, accounts: 0 });
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showAddLeads, setShowAddLeads] = useState(false);
+  const [toast, setToast] = useState<{ type: 'ok' | 'error'; msg: string } | null>(null);
+  const [replyEngineRunning, setReplyEngineRunning] = useState(false);
+
+  const [newCampaign, setNewCampaign] = useState({
+    name: '',
+    account_id: '',
+    message_template: 'Hey {{name}}! I came across your profile and thought we could collaborate.',
+    goal: 'Book a discovery call',
+    offer_summary: '',
+  });
+
+  const [newLeadsText, setNewLeadsText] = useState('');
+  const [newLeadsCampaign, setNewLeadsCampaign] = useState('');
+
+  const showToast = (type: 'ok' | 'error', msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cRes, aRes, lRes, repRes, sRes] = await Promise.all([
+        fetch(MC + '/api/outreach/campaigns').then(r => r.json()),
+        fetch(MC + '/api/outreach/accounts').then(r => r.json()),
+        fetch(MC + '/api/outreach/leads').then(r => r.json()),
+        fetch(MC + '/api/outreach/replies').then(r => r.json()),
+        fetch(MC + '/api/outreach/stats').then(r => r.json()),
+      ]);
+      setCampaigns(cRes.campaigns || []);
+      setAccounts(aRes.accounts || []);
+      setLeads(lRes.leads || []);
+      setReplies(repRes.replies || []);
+      setStats(sRes || { total_sent: 0, sent_today: 0, accounts: 0 });
+    } catch { /* MC not reachable */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const runCampaign = async (id: string) => {
+    try {
+      const res = await fetch(MC + '/api/outreach/campaigns/' + id + '/run', { method: 'POST' });
+      const d = await res.json();
+      showToast(d.success ? 'ok' : 'error', d.success ? 'Campaign launched!' : (d.error || 'Failed'));
+    } catch { showToast('error', 'Could not reach MC server'); }
+  };
+
+  const toggleCampaign = async (id: string) => {
+    try {
+      const res = await fetch(MC + '/api/outreach/campaigns/' + id + '/toggle', { method: 'POST' });
+      const d = await res.json();
+      if (d.success) setCampaigns(cs => cs.map(c => c.id === id ? { ...c, active: !c.active } : c));
+    } catch { showToast('error', 'Could not reach MC server'); }
+  };
+
+  const deleteCampaign = async (id: string) => {
+    if (!confirm('Delete this campaign?')) return;
+    try {
+      const res = await fetch(MC + '/api/outreach/campaigns/' + id, { method: 'DELETE' });
+      const d = await res.json();
+      if (d.success) setCampaigns(cs => cs.filter(c => c.id !== id));
+    } catch { showToast('error', 'Could not reach MC server'); }
+  };
+
+  const createCampaign = async () => {
+    if (!newCampaign.name.trim()) { showToast('error', 'Campaign name required'); return; }
+    try {
+      const res = await fetch(MC + '/api/outreach/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCampaign),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setCampaigns(cs => [...cs, { ...d.campaign, dms_sent: 0, leads_total: 0, leads_contacted: 0, replies_received: 0 }]);
+        setShowCreate(false);
+        setNewCampaign({ name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '' });
+        showToast('ok', 'Campaign created');
+      } else {
+        showToast('error', d.error || 'Failed to create');
+      }
+    } catch { showToast('error', 'Could not reach MC server'); }
+  };
+
+  const addLeads = async () => {
+    if (!newLeadsText.trim() || !newLeadsCampaign) { showToast('error', 'Select campaign and enter usernames'); return; }
+    const usernames = newLeadsText.split('\n').map(u => u.trim()).filter(Boolean);
+    if (usernames.length === 0) { showToast('error', 'No valid usernames'); return; }
+    const firstAccount = accounts.find(a => a.id === newLeadsCampaign) || accounts[0];
+    try {
+      const res = await fetch(MC + '/api/outreach/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leads: usernames.map(username => ({ username, campaign_id: newLeadsCampaign, source: 'manual' })),
+          account_id: firstAccount?.id || '',
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        showToast('ok', `Added ${d.added} lead${d.added !== 1 ? 's' : ''}`);
+        setShowAddLeads(false);
+        setNewLeadsText('');
+        loadAll();
+      } else {
+        showToast('error', d.error || 'Failed to add');
+      }
+    } catch { showToast('error', 'Could not reach MC server'); }
+  };
+
+  const triggerReplyEngine = async () => {
+    setReplyEngineRunning(true);
+    try {
+      const res = await fetch(MC + '/api/outreach/reply-engine', { method: 'POST' });
+      const d = await res.json();
+      if (d.success) { showToast('ok', 'Reply engine triggered'); loadAll(); }
+      else showToast('error', d.error || 'Failed');
+    } catch { showToast('error', 'Could not reach MC server'); }
+    setTimeout(() => setReplyEngineRunning(false), 3000);
+  };
+
+  const handleConnect = async () => {
+    if (accounts.length === 0) { showToast('error', 'No IG accounts configured'); return; }
+    try {
+      const res = await fetch(MC + '/api/ig/browser/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: accounts[0].id }),
+      });
+      const d = await res.json();
+      if (d.success) showToast('ok', 'Browser opened for @' + accounts[0].username);
+      else showToast('error', d.error || 'Failed to open browser');
+    } catch { showToast('error', 'Could not reach MC server'); }
+  };
+
+  const connectedAccounts = accounts.filter(a => a.status === 'active' || a.status === 'connected');
+  const totalReplies = replies.length;
+  const escalatedCount = replies.filter(r => r.escalated).length;
+
+  const statusBadge = (active: boolean) => (
+    <span style={{
+      padding: '2px 8px', borderRadius: 99, fontSize: '10px', fontWeight: 700,
+      background: active ? 'rgba(34,197,94,0.12)' : 'rgba(107,114,128,0.12)',
+      color: active ? '#22c55e' : '#6b7280',
+      border: '1px solid ' + (active ? 'rgba(34,197,94,0.25)' : 'rgba(107,114,128,0.25)'),
+    }}>
+      {active ? 'ACTIVE' : 'PAUSED'}
+    </span>
+  );
 
   return (
     <div>
@@ -14,43 +222,47 @@ export default function OutreachPage() {
         <div className="topbar-title">IG Outreach</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 12px' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--text-3)' }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>Not connected</span>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: connectedAccounts.length > 0 ? '#22c55e' : 'var(--text-3)' }} />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>
+              {connectedAccounts.length > 0 ? connectedAccounts.length + ' connected' : 'Not connected'}
+            </span>
           </div>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', fontFamily: 'inherit' }}>
+          <button onClick={handleConnect} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', fontFamily: 'inherit' }}>
             <Plug size={12} /> Connect
           </button>
         </div>
       </div>
 
       <div className="page-content">
+        <AnimatePresence>
+          {toast && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              style={{
+                position: 'fixed', top: 80, right: 20, zIndex: 9999,
+                background: toast.type === 'ok' ? '#166534' : '#991b1b',
+                color: 'white', padding: '10px 18px', borderRadius: 8,
+                fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              }}>
+              {toast.type === 'ok' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+              {toast.msg}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
           <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Mass DM + AI Replies</div>
           <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Automated Instagram outreach with intelligent response handling</div>
         </motion.div>
 
-        {/* Empty state */}
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '48px 32px', textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <Send size={20} style={{ color: ACCENT }} />
-          </div>
-          <div style={{ fontSize: '15px', fontWeight: 800, marginBottom: 6 }}>Connect your Instagram accounts</div>
-          <div style={{ fontSize: '13px', color: 'var(--text-3)', maxWidth: 320, margin: '0 auto 20px', lineHeight: 1.65 }}>
-            Link your IG accounts to run outreach campaigns, manage leads, and handle AI-powered replies at scale.
-          </div>
-          <button style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
-            <Plug size={13} /> Connect Instagram
-          </button>
-        </motion.div>
-
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14, opacity: 0.6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 14 }}>
           {[
-            { icon: <Send size={13} />, val: '—', label: 'DMs Sent', sub: 'All time' },
-            { icon: <MessageSquare size={13} />, val: '—', label: 'Replies', sub: 'Received' },
-            { icon: <TrendingUp size={13} />, val: '—', label: 'Escalated', sub: 'To human' },
-            { icon: <Users size={13} />, val: '—', label: 'Campaigns', sub: 'Active' },
+            { icon: <Send size={13} />, val: loading ? '—' : stats.total_sent, label: 'DMs Sent', sub: 'All time' },
+            { icon: <TrendingUp size={13} />, val: loading ? '—' : stats.sent_today, label: 'Sent Today', sub: 'All accounts' },
+            { icon: <MessageSquare size={13} />, val: loading ? '—' : totalReplies, label: 'Replies', sub: 'Received' },
+            { icon: <AlertCircle size={13} />, val: loading ? '—' : escalatedCount, label: 'Escalated', sub: 'To human' },
+            { icon: <Users size={13} />, val: loading ? '—' : campaigns.filter(c => c.active).length, label: 'Active', sub: 'Campaigns' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '13px' }}>
@@ -67,67 +279,317 @@ export default function OutreachPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14, alignItems: 'start' }}>
           {/* Left */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Tabs */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-              <div style={{ padding: '0 4px', borderBottom: '1px solid var(--border)', display: 'flex' }}>
-                {(['campaigns', 'leads', 'analytics'] as const).map((t) => (
-                  <button key={t} onClick={() => setTab(t)} style={{
-                    padding: '12px 18px', fontSize: '12px', fontWeight: 600,
-                    border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                    color: tab === t ? 'var(--text)' : 'var(--text-3)',
-                    background: 'transparent', borderBottom: `2px solid ${tab === t ? ACCENT : 'transparent'}`, transition: 'all 0.15s',
-                  }}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
+              <div style={{ padding: '0 4px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex' }}>
+                  {(['campaigns', 'leads', 'analytics'] as const).map((t) => (
+                    <button key={t} onClick={() => setTab(t)} style={{
+                      padding: '12px 18px', fontSize: '12px', fontWeight: 600,
+                      border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      color: tab === t ? 'var(--text)' : 'var(--text-3)',
+                      background: 'transparent', borderBottom: '2px solid ' + (tab === t ? ACCENT : 'transparent'), transition: 'all 0.15s',
+                    }}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {tab === 'campaigns' && (
+                  <button onClick={() => setShowCreate(true)} style={{ marginRight: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
+                    <Plus size={12} /> New Campaign
                   </button>
-                ))}
+                )}
+                {tab === 'leads' && (
+                  <button onClick={() => setShowAddLeads(true)} style={{ marginRight: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
+                    <Plus size={12} /> Add Leads
+                  </button>
+                )}
               </div>
-              <div style={{ padding: '36px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>No data yet</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-4)' }}>Your outreach data will appear here once connected</div>
-              </div>
+
+              {tab === 'campaigns' && (
+                <div style={{ padding: '16px' }}>
+                  {loading && campaigns.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-3)', fontSize: '13px' }}>Loading...</div>
+                  ) : campaigns.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>No campaigns yet</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-4)', marginBottom: 16 }}>Create your first campaign to start outreach</div>
+                      <button onClick={() => setShowCreate(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
+                        <Plus size={13} /> Create Campaign
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {campaigns.map(c => (
+                        <div key={c.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: 2 }}>{c.name}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Goal: {c.goal}</div>
+                            </div>
+                            {statusBadge(c.active)}
+                          </div>
+                          <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+                            {[{ label: 'DMs Sent', val: c.dms_sent ?? 0 }, { label: 'Leads', val: c.leads_total ?? 0 }, { label: 'Replied', val: c.replies_received ?? 0 }].map(s => (
+                              <div key={s.label}>
+                                <div style={{ fontSize: '14px', fontWeight: 800 }}>{s.val}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-4)' }}>{s.label}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => runCampaign(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 'var(--radius-sm)', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#22c55e', fontFamily: 'inherit' }}>
+                              <Play size={11} /> Run
+                            </button>
+                            <button onClick={() => toggleCampaign(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-3)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--text-2)', fontFamily: 'inherit' }}>
+                              <Pause size={11} /> {c.active ? 'Pause' : 'Resume'}
+                            </button>
+                            <button onClick={() => deleteCampaign(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 'var(--radius-sm)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: '#ef4444', fontFamily: 'inherit' }}>
+                              <Trash2 size={11} /> Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === 'leads' && (
+                <div style={{ padding: '16px' }}>
+                  {loading && leads.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-3)', fontSize: '13px' }}>Loading...</div>
+                  ) : leads.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>No leads yet</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-4)' }}>Add leads to your campaigns to start outreach</div>
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                            {['Username', 'Campaign', 'Status', 'Source', 'Added'].map(h => (
+                              <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, color: 'var(--text-3)', fontSize: '10px', textTransform: 'uppercase' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leads.slice(0, 50).map(l => {
+                            const camp = campaigns.find(c => c.id === l.campaign_id);
+                            const statusColors: Record<string, string> = { pending: '#f59e0b', sent: '#3b82f6', replied: '#22c55e', escalated: '#ef4444', failed: '#6b7280' };
+                            return (
+                              <tr key={l.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '8px 8px', fontWeight: 600 }}>@{l.username}</td>
+                                <td style={{ padding: '8px 8px', color: 'var(--text-3)' }}>{camp?.name || l.campaign_id}</td>
+                                <td style={{ padding: '8px 8px' }}>
+                                  <span style={{ padding: '2px 7px', borderRadius: 99, fontSize: '10px', fontWeight: 700, background: statusColors[l.status] ? statusColors[l.status] + '18' : 'var(--surface-3)', color: statusColors[l.status] || 'var(--text-3)', border: '1px solid ' + (statusColors[l.status] || 'var(--border)') + '30' }}>
+                                    {l.status.toUpperCase()}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '8px 8px', color: 'var(--text-4)' }}>{l.source}</td>
+                                <td style={{ padding: '8px 8px', color: 'var(--text-4)' }}>{new Date(l.added_at).toLocaleDateString()}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {leads.length > 50 && <div style={{ textAlign: 'center', padding: '10px', fontSize: '11px', color: 'var(--text-4)' }}>Showing 50 of {leads.length} leads</div>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === 'analytics' && (
+                <div style={{ padding: '16px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Recent Replies</div>
+                  {replies.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-3)', fontSize: '13px' }}>No replies yet</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {replies.slice(0, 20).map(r => {
+                        const camp = campaigns.find(c => c.id === r.campaign_id);
+                        return (
+                          <div key={r.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700 }}>@{r.username}</span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-4)' }}>{new Date(r.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: 4 }}>"{r.message}"</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', color: 'var(--text-4)' }}>{camp?.name || r.campaign_id}</span>
+                              {r.escalated && <span style={{ padding: '1px 6px', borderRadius: 99, fontSize: '9px', fontWeight: 700, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>ESCALATED</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </div>
 
           {/* Right sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* AI Reply Settings — disabled */}
+            {/* AI Reply Engine */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', opacity: 0.6 }}>
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>AI Reply Engine</div>
+                <button onClick={triggerReplyEngine} disabled={replyEngineRunning} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 'var(--radius-sm)', background: replyEngineRunning ? 'var(--surface-3)' : ACCENT, border: 'none', cursor: replyEngineRunning ? 'default' : 'pointer', fontSize: '10px', fontWeight: 700, color: replyEngineRunning ? 'var(--text-3)' : 'white', fontFamily: 'inherit' }}>
+                  <Zap size={10} /> {replyEngineRunning ? 'Running...' : 'Trigger'}
+                </button>
               </div>
               <div style={{ padding: '14px 16px' }}>
-                {[
-                  { label: 'Auto-reply to DMs', sub: 'Requires connection' },
-                  { label: 'Escalate on intent', sub: 'Requires connection' },
-                  { label: 'Learning mode', sub: 'Requires connection' },
-                ].map((s, i) => (
-                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: i < 2 ? 10 : 0 }}>
-                    <div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-2)' }}>{s.label}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>{s.sub}</div>
-                    </div>
-                    <div style={{ width: 36, height: 20, borderRadius: 99, background: 'var(--surface-3)', position: 'relative', cursor: 'not-allowed' }}>
-                      <div style={{ position: 'absolute', left: 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'var(--text-3)' }} />
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-2)' }}>Auto-reply to DMs</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>AI responds to incoming DMs</div>
                   </div>
-                ))}
+                  <div style={{ width: 36, height: 20, borderRadius: 99, background: ACCENT, position: 'relative' }}>
+                    <div style={{ position: 'absolute', right: 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'white' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-2)' }}>Escalate on intent</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Flag hot leads for human</div>
+                  </div>
+                  <div style={{ width: 36, height: 20, borderRadius: 99, background: 'var(--surface-3)', position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'var(--text-3)' }} />
+                  </div>
+                </div>
               </div>
             </motion.div>
 
-            {/* DM Templates — empty */}
+            {/* DM Templates */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>DM Templates</div>
               </div>
-              <div style={{ padding: '24px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>No templates yet</div>
+              <div style={{ padding: '14px 16px' }}>
+                {campaigns.length === 0 ? (
+                  <div style={{ fontSize: '12px', color: 'var(--text-3)', textAlign: 'center', padding: '8px 0' }}>No templates yet</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {campaigns.slice(0, 3).map(c => (
+                      <div key={c.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px' }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, marginBottom: 3 }}>{c.name}</div>
+                        <div style={{ fontSize: '10.5px', color: 'var(--text-4)', lineHeight: 1.5 }}>{c.message_template.substring(0, 60)}...</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* IG Accounts */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>IG Accounts</div>
+              </div>
+              <div style={{ padding: '14px 16px' }}>
+                {accounts.length === 0 ? (
+                  <div style={{ fontSize: '12px', color: 'var(--text-3)', textAlign: 'center', padding: '8px 0' }}>No accounts yet</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {accounts.map(a => (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 600 }}>@{a.username}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-4)' }}>{a.days_active ?? 0}d active &middot; limit {a.current_daily_limit ?? 5}/day</div>
+                        </div>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: (a.status === 'active' || a.status === 'connected') ? '#22c55e' : 'var(--text-3)' }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
         </div>
+
+        {/* Create Campaign Modal */}
+        <AnimatePresence>
+          {showCreate && (
+            <motion.div            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }}>
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <div style={{ fontSize: '15px', fontWeight: 800 }}>New Campaign</div>
+                  <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}><X size={18} /></button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Campaign Name</div>
+                    <input value={newCampaign.name} onChange={e => setNewCampaign(c => ({ ...c, name: e.target.value }))} placeholder="e.g. Real Estate Agents - Q2" style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>IG Account</div>
+                    <select value={newCampaign.account_id} onChange={e => setNewCampaign(c => ({ ...c, account_id: e.target.value }))} style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit' }}>
+                      <option value="">Select account...</option>
+                      {accounts.map(a => <option key={a.id} value={a.id}>@{a.username}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Message Template</div>
+                    <textarea value={newCampaign.message_template} onChange={e => setNewCampaign(c => ({ ...c, message_template: e.target.value }))} rows={4} style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: 3 }}>Use {'{{name}}'} for personalization</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Goal</div>
+                    <input value={newCampaign.goal} onChange={e => setNewCampaign(c => ({ ...c, goal: e.target.value }))} placeholder="e.g. Book a discovery call" style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Offer Summary</div>
+                    <textarea value={newCampaign.offer_summary} onChange={e => setNewCampaign(c => ({ ...c, offer_summary: e.target.value }))} rows={2} placeholder="Brief description of what you are offering..." style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+                  <button onClick={createCampaign} style={{ padding: '10px', background: ACCENT, border: 'none', borderRadius: 6, color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Create Campaign
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Add Leads Modal */}
+        <AnimatePresence>
+          {showAddLeads && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              onClick={(e) => { if (e.target === e.currentTarget) setShowAddLeads(false); }}>
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, width: '100%', maxWidth: 480 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <div style={{ fontSize: '15px', fontWeight: 800 }}>Add Leads</div>
+                  <button onClick={() => setShowAddLeads(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}><X size={18} /></button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Campaign</div>
+                    <select value={newLeadsCampaign} onChange={e => setNewLeadsCampaign(e.target.value)} style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit' }}>
+                      <option value="">Select campaign...</option>
+                      {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Usernames (one per line)</div>
+                    <textarea value={newLeadsText} onChange={e => setNewLeadsText(e.target.value)} rows={8} placeholder="chefmike_restaurant&#10;realtor_sarah_la&#10;homebuilder_dave_tx" style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+                  <button onClick={addLeads} style={{ padding: '10px', background: ACCENT, border: 'none', borderRadius: 6, color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Add {newLeadsText.split('\n').filter(l => l.trim()).length} Leads
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
