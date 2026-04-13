@@ -8,12 +8,13 @@ import {
   Twitter,
   Linkedin,
   Music,
-  Wand2,
   Send,
   Settings,
   LogOut,
   Menu,
   X,
+  User,
+  Users,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: '/x-system',    label: 'X System',       icon: <Twitter size={16} /> },
   { href: '/linkedin',    label: 'LinkedIn',       icon: <Linkedin size={16} /> },
   { href: '/tiktok',      label: 'TikTok UGC',     icon: <Music size={16} /> },
+  { href: '/accounts',    label: 'Accounts',       icon: <Users size={16} /> },
   { href: '/outreach',    label: 'IG Outreach',    icon: <Send size={16} /> },
   { href: '/client-config', label: 'Client Config', icon: <Settings size={16} /> },
 ];

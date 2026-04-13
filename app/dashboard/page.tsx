@@ -1,7 +1,7 @@
 'use client';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Video, Twitter, Linkedin, Music, Send, ArrowRight } from 'lucide-react';
+import { Video, Twitter, Linkedin, Music, Send, ArrowRight, Users } from 'lucide-react';
 
 const SYSTEMS = [
   {
@@ -35,6 +35,14 @@ const SYSTEMS = [
     desc: 'HeyGen + TikTok auto-posting',
     accent: '#f43f5e',
     route: '/tiktok',
+  },
+  {
+    href: '/accounts',
+    icon: <Users size={18} />,
+    label: 'Accounts',
+    desc: 'Connect + manage IG/AdsPower profiles',
+    accent: '#8b5cf6',
+    route: '/accounts',
   },
   {
     href: '/outreach',
