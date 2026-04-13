@@ -39,6 +39,8 @@ export default function LinkedInPage() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [autoPost, setAutoPost] = useState({ morning: false, midday: false, evening: false });
+  const [autoPostLinkedIn, setAutoPostLinkedIn] = useState(false);
+  const [autoPostHourLinkedIn, setAutoPostHourLinkedIn] = useState(13);
 
   const loadPosts = useCallback(async () => {
     setLoadingPosts(true);
@@ -53,7 +55,26 @@ export default function LinkedInPage() {
 
   useEffect(() => {
     loadPosts();
+    // Load LinkedIn auto-post state
+    fetch('http://127.0.0.1:3337/api/auto-post-state?platform=linkedin')
+      .then(r => r.json())
+      .then(data => { if (data.enabled !== undefined) { setAutoPostLinkedIn(data.enabled); setAutoPostHourLinkedIn(data.hourUtc || 13); } })
+      .catch(() => {});
   }, [loadPosts]);
+
+  const handleAutoPostToggleLinkedIn = async () => {
+    const newVal = !autoPostLinkedIn;
+    setAutoPostLinkedIn(newVal);
+    try {
+      const res = await fetch('http://127.0.0.1:3337/api/auto-post-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'linkedin', enabled: newVal, hourUtc: autoPostHourLinkedIn }),
+      });
+      const data = await res.json();
+      if (data.state) { setAutoPostLinkedIn(data.state.enabled); setAutoPostHourLinkedIn(data.state.hourUtc); }
+    } catch { setAutoPostLinkedIn(newVal); }
+  };
 
   const handlePostNow = async () => {
     if (!postText.trim()) return;
@@ -318,12 +339,17 @@ export default function LinkedInPage() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-2)' }}>Auto-post</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Coming soon</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Daily text post via content engine</div>
                   </div>
-                  <div style={{ width: 36, height: 20, borderRadius: 99, background: 'var(--surface-3)', position: 'relative', cursor: 'not-allowed' }}>
-                    <div style={{ position: 'absolute', left: 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'var(--text-3)' }} />
-                  </div>
+                  <button
+                    onClick={handleAutoPostToggleLinkedIn}
+                    style={{ width: 36, height: 20, borderRadius: 99, background: autoPostLinkedIn ? '#10b981' : 'var(--surface-3)', position: 'relative', cursor: 'pointer', border: 'none', transition: 'background 0.2s' }}>
+                    <div style={{ position: 'absolute', left: autoPostLinkedIn ? 19 : 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
+                  </button>
                 </div>
+                {autoPostLinkedIn && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Next post: tomorrow ~{autoPostHourLinkedIn > 12 ? autoPostHourLinkedIn - 12 + 'PM' : autoPostHourLinkedIn + 'AM'} UTC</div>
+                )}
               </div>
             </div>
           </div>

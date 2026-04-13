@@ -23,6 +23,8 @@ interface ScheduledPost {
 export default function TikTokPage() {
   const [caption, setCaption] = useState('');
   const [schedulingFor, setSchedulingFor] = useState('');
+  const [autoPostTikTok, setAutoPostTikTok] = useState(false);
+  const [autoPostHourTikTok, setAutoPostHourTikTok] = useState(14);
   const [isPostingNow, setIsPostingNow] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [postMsg, setPostMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
@@ -45,7 +47,26 @@ export default function TikTokPage() {
 
   useEffect(() => {
     loadPosts();
+    // Load auto-post state
+    fetch('http://127.0.0.1:3337/api/tiktok/auto-post')
+      .then(r => r.json())
+      .then(data => { if (data.enabled !== undefined) { setAutoPostTikTok(data.enabled); setAutoPostHourTikTok(data.hourUtc || 14); } })
+      .catch(() => {});
   }, [loadPosts]);
+
+  const handleAutoPostToggleTikTok = async () => {
+    const newVal = !autoPostTikTok;
+    setAutoPostTikTok(newVal);
+    try {
+      const res = await fetch('http://127.0.0.1:3337/api/tiktok/auto-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newVal, hourUtc: autoPostHourTikTok }),
+      });
+      const data = await res.json();
+      if (data.state) { setAutoPostTikTok(data.state.enabled); setAutoPostHourTikTok(data.state.hourUtc); }
+    } catch { setAutoPostTikTok(newVal); }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -310,12 +331,17 @@ export default function TikTokPage() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-2)' }}>Auto-Post</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Coming soon</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>New video daily via HeyGen</div>
                   </div>
-                  <div style={{ width: 36, height: 20, borderRadius: 99, background: 'var(--surface-3)', position: 'relative', cursor: 'not-allowed' }}>
-                    <div style={{ position: 'absolute', left: 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'var(--text-3)' }} />
-                  </div>
+                  <button
+                    onClick={handleAutoPostToggleTikTok}
+                    style={{ width: 36, height: 20, borderRadius: 99, background: autoPostTikTok ? '#10b981' : 'var(--surface-3)', position: 'relative', cursor: 'pointer', border: 'none', transition: 'background 0.2s' }}>
+                    <div style={{ position: 'absolute', left: autoPostTikTok ? 19 : 3, top: 3, width: 14, height: 14, borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
+                  </button>
                 </div>
+                {autoPostTikTok && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-4)' }}>Next post: tomorrow ~{autoPostHourTikTok > 12 ? autoPostHourTikTok - 12 + 'PM' : autoPostHourTikTok + 'AM'} UTC</div>
+                )}
               </div>
             </div>
           </div>

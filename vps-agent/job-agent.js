@@ -431,6 +431,32 @@ async function executeScheduledPost(spost) {
         throw new Error(result.error || 'LinkedIn post failed');
       }
       return;
+    } else if (platform === 'tiktok' && post_text && post_text.includes('[HEYGEN:]')) {
+      // TikTok auto-post: generate UGC script → HeyGen → post
+      const scriptText = post_text.replace('[HEYGEN:]', '').trim();
+      log('info', 'TikTok HeyGen auto-post triggered', { postId: id });
+      const result = await mcRequest('/api/tiktok/auto', 'POST', { scriptText });
+      if (result.success) {
+        await markScheduledPostPublished(id, 'heygiktok', null);
+        await markCompleted(id, { platform: 'tiktok', type: 'heygiktok_auto' });
+        await autoRescheduleIG('tiktok');
+      } else {
+        throw new Error(result.error || 'TikTok HeyGen auto-post failed');
+      }
+      return;
+    } else if (platform === 'instagram' && post_text && post_text.includes('[HEYGEN:]')) {
+      // Instagram auto-post: generate UGC script → HeyGen → post to all accounts
+      const scriptText = post_text.replace('[HEYGEN:]', '').trim();
+      log('info', 'Instagram HeyGen auto-post triggered', { postId: id });
+      const result = await mcRequest('/api/instagram/auto', 'POST', { scriptText });
+      if (result.success) {
+        await markScheduledPostPublished(id, 'heygig', null);
+        await markCompleted(id, { platform: 'instagram', type: 'heygig_auto' });
+        await autoRescheduleIG('instagram');
+      } else {
+        throw new Error(result.error || 'Instagram HeyGen auto-post failed');
+      }
+      return;
     } else if (platform === 'tiktok') {
       // Video path embedded in post_text as "[TTVIDEO:]filename.mp4[TTVIDEO_END]"
       const ttMatch = post_text.match(/\[TTVIDEO:\](.+?)\[TTVIDEO_END\]/);
@@ -454,8 +480,8 @@ async function executeScheduledPost(spost) {
     }
   }
 
-  // Auto-generate content — only X has content engine
-  if (platform === 'x') {
+  // Auto-generate content — X and LinkedIn use content engine
+  if (platform === 'x' || platform === 'linkedin') {
     const ce = getContentEngine();
     if (!ce) throw new Error('Content engine not available on this VPS');
 
@@ -486,19 +512,31 @@ async function executeScheduledPost(spost) {
     }
 
     // Post the generated content
-    const result = await mcRequest('/api/x/post', 'POST', {
-      text: generated,
-      tweetText: generated,
-    });
-
-    if (result.success) {
-      await markScheduledPostPublished(id, result.tweetId, null);
-      await markCompleted(id, { tweetId: result.tweetId, url: result.url });
-
-      // Auto-reschedule: if toggle still on for this daypart, create tomorrow's entry
-      await autoReschedule(daypart);
-    } else {
-      throw new Error(result.error || 'Post failed');
+    if (platform === 'x') {
+      const result = await mcRequest('/api/x/post', 'POST', {
+        text: generated,
+        tweetText: generated,
+      });
+      if (result.success) {
+        await markScheduledPostPublished(id, result.tweetId, null);
+        await markCompleted(id, { tweetId: result.tweetId, url: result.url });
+        await autoReschedule(daypart);
+      } else {
+        throw new Error(result.error || 'Post failed');
+      }
+    } else if (platform === 'linkedin') {
+      // Generate a LinkedIn-formatted version of the content (slightly longer, article-style)
+      const liText = generated; // Could expand this later for LinkedIn-specific formatting
+      const result = await mcRequest('/api/linkedin/post', 'POST', { text: liText });
+      if (result.success) {
+        await markScheduledPostPublished(id, result.postId, null);
+        await markCompleted(id, { postId: result.postId, url: result.url });
+        // Auto-reschedule LinkedIn for tomorrow at the same hour
+        const liHour = new Date(spost.scheduled_for).getHours();
+        await autoRescheduleLinkedIn(liHour);
+      } else {
+        throw new Error(result.error || 'LinkedIn post failed');
+      }
     }
   } else {
     throw new Error(`Auto-post not supported for ${platform} — provide post_text`);
@@ -508,6 +546,51 @@ async function executeScheduledPost(spost) {
 // ============================================
 // AUTO-RESCHEDULE — create tomorrow's entry if toggle still on
 // ============================================
+async function autoRescheduleIG(platform) {
+  try {
+    const fs = require('fs');
+    const STATE_PATH = 'C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\x-poster\\tiktok-instagram-auto-state.json';
+    const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+    const cfg = state[platform];
+    if (!cfg || !cfg.enabled) return; // Toggle is OFF, no reschedule
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(cfg.hourUtc, 0, 0, 0);
+
+    await supabaseRequest('POST', 'scheduled_posts', {
+      platform: platform,
+      post_text: '[HEYGEN:]',
+      scheduled_for: tomorrow.toISOString(),
+      status: 'scheduled',
+    });
+    log('info', `Auto-rescheduled ${platform} for ${tomorrow.toISOString()}`);
+  } catch(e) {
+    log('warn', 'Auto-rescheduleIG failed', { platform, error: e.message });
+  }
+}
+
+async function autoRescheduleLinkedIn(hourUtc) {
+  try {
+    const fs = require('fs');
+    const STATE_PATH = 'C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\x-poster\\tiktok-instagram-auto-state.json';
+    const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+    if (!state.linkedin || !state.linkedin.enabled) return; // Toggle is OFF
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(hourUtc, 0, 0, 0);
+    await supabaseRequest('POST', 'scheduled_posts', {
+      platform: 'linkedin',
+      post_text: '',
+      scheduled_for: tomorrow.toISOString(),
+      status: 'scheduled',
+    });
+    log('info', `Auto-rescheduled LinkedIn for ${tomorrow.toISOString()}`);
+  } catch(e) {
+    log('warn', 'Auto-rescheduleLinkedIn failed', { error: e.message });
+  }
+}
+
 async function autoReschedule(daypart) {
   try {
     const fs = require('fs');
