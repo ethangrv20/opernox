@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { href: '/accounts',    label: 'Accounts',       icon: <Users size={16} /> },
   { href: '/outreach',    label: 'IG Outreach',    icon: <Send size={16} /> },
   { href: '/client-config', label: 'Client Config', icon: <Settings size={16} /> },
+  { href: '/admin/vps',    label: 'Admin: VPS',     icon: <Settings size={16} /> },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -66,7 +67,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS
+            .filter(item => {
+              // Hide admin links from non-admin users
+              if (item.href.startsWith('/admin') && user.email !== 'ethangrv@gmail.com') return false;
+              return true;
+            })
+            .map((item) => (
             <Link
               key={item.href}
               href={item.href}
