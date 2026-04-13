@@ -15,13 +15,7 @@ const supabaseAdmin = createClient(
 );
 
 export async function GET(request: NextRequest) {
-  // Get user from session cookie
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujdegmhsvwymxzezwwna.supabase.co';
-  
-  // Get user from session cookie
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujdegmhsvwymxzezwwna.supabase.co';
   const accessToken = request.cookies.get('sb-access-token')?.value;
-  const refreshToken = request.cookies.get('sb-refresh-token')?.value;
 
   if (!accessToken) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
