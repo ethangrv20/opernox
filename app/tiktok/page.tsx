@@ -92,12 +92,15 @@ export default function TikTokPage() {
 
       // 2. Create scheduled post
       const { error } = await supabase.from('scheduled_posts').insert({
-        platform: 'tiktok',
-        post_text: caption.trim(),
-        scheduled_for: new Date().toISOString(),
-        status: 'scheduled',
-        metadata: { video_path: videoPath },
-      });
+        // Embed video filename in post_text so job agent can find it (no metadata column in DB)
+        const videoFileName = videoPath.split(/[\\/]/).pop() || '';
+        const postTextWithVideo = caption.trim() + '[TTVIDEO:]' + videoFileName + '[TTVIDEO_END]';
+        const { error } = await supabase.from('scheduled_posts').insert({
+          platform: 'tiktok',
+          post_text: postTextWithVideo,
+          scheduled_for: new Date().toISOString(),
+          status: 'scheduled',
+        });
 
       if (error) throw new Error(error.message);
 
@@ -249,7 +252,7 @@ export default function TikTokPage() {
                     <div key={post.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', color: 'var(--text)', marginBottom: 4, lineHeight: 1.5 }}>
-                          {post.post_text?.substring(0, 80)}{post.post_text?.length > 80 ? '...' : ''}
+                          {post.post_text?.replace(/\[TTVIDEO:\].*?\[TTVIDEO_END\]/, '[video]').substring(0, 80)}{post.post_text?.length > 80 ? '...' : ''}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: post.status === 'published' ? 'rgba(16,185,129,0.1)' : post.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)', color: post.status === 'published' ? '#10b981' : post.status === 'failed' ? '#ef4444' : '#eab308' }}>

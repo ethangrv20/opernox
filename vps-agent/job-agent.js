@@ -404,8 +404,7 @@ function getContentEngine() {
 // EXECUTE SCHEDULED POST — generate content and post
 // ============================================
 async function executeScheduledPost(spost) {
-  const { id, platform, post_text, user_id, metadata } = spost;
-  const video_path = metadata?.video_path;
+  const { id, platform, post_text, user_id } = spost;
 
   log('info', 'Executing scheduled post', { postId: id, platform });
 
@@ -433,10 +432,15 @@ async function executeScheduledPost(spost) {
       }
       return;
     } else if (platform === 'tiktok') {
-      if (!video_path) throw new Error('TikTok post requires video_path');
+      // Video path embedded in post_text as "[TTVIDEO:]filename.mp4[TTVIDEO_END]"
+      const ttMatch = post_text.match(/\[TTVIDEO:\](.+?)\[TTVIDEO_END\]/);
+      const ttVideoFileName = ttMatch ? ttMatch[1] : null;
+      const ttCaption = (post_text || '').replace(/\[TTVIDEO:\].*?\[TTVIDEO_END\]/, '').trim();
+      if (!ttVideoFileName) throw new Error('TikTok post requires video — filename not found in post_text');
+      const ttVideoPath = path.join('C:\\Users\\Administrator\\.openclaw\\runtime-workspace\\tiktok-videos', ttVideoFileName);
       const result = await mcRequest('/api/tiktok/post', 'POST', {
-        caption: post_text.trim(),
-        videoPath: video_path,
+        caption: ttCaption,
+        videoPath: ttVideoPath,
       });
       if (result.success) {
         await markScheduledPostPublished(id, result.videoId, null);
