@@ -90,17 +90,15 @@ export default function TikTokPage() {
       const videoPath = await uploadVideo(selectedVideo);
       if (!videoPath) throw new Error('Video upload returned no path');
 
-      // 2. Create scheduled post
+      // 2. Create scheduled post — embed video filename so job agent can find it (no metadata column)
+      const videoFileName = (videoPath.split(/[\\/]/).pop() || '');
+      const postTextWithVideo = caption.trim() + '[TTVIDEO:]' + videoFileName + '[TTVIDEO_END]';
       const { error } = await supabase.from('scheduled_posts').insert({
-        // Embed video filename in post_text so job agent can find it (no metadata column in DB)
-        const videoFileName = videoPath.split(/[\\/]/).pop() || '';
-        const postTextWithVideo = caption.trim() + '[TTVIDEO:]' + videoFileName + '[TTVIDEO_END]';
-        const { error } = await supabase.from('scheduled_posts').insert({
-          platform: 'tiktok',
-          post_text: postTextWithVideo,
-          scheduled_for: new Date().toISOString(),
-          status: 'scheduled',
-        });
+        platform: 'tiktok',
+        post_text: postTextWithVideo,
+        scheduled_for: new Date().toISOString(),
+        status: 'scheduled',
+      });
 
       if (error) throw new Error(error.message);
 
