@@ -1,14 +1,14 @@
 'use client';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Video, Twitter, Linkedin, Music, Wand2, Send, ArrowRight } from 'lucide-react';
+import { Video, Twitter, Linkedin, Music, Send, ArrowRight } from 'lucide-react';
 
 const SYSTEMS = [
   {
     href: '/ugc',
     icon: <Video size={18} />,
-    label: 'UGC System',
-    desc: 'HeyGen + Instagram automation',
+    label: 'Instagram UGC',
+    desc: 'HeyGen + Instagram auto-posting',
     accent: '#10b981',
     route: '/ugc',
   },
@@ -31,18 +31,10 @@ const SYSTEMS = [
   {
     href: '/tiktok',
     icon: <Music size={18} />,
-    label: 'TikTok',
-    desc: 'Short-form video uploads',
+    label: 'TikTok UGC',
+    desc: 'HeyGen + TikTok auto-posting',
     accent: '#f43f5e',
     route: '/tiktok',
-  },
-  {
-    href: '/heygen',
-    icon: <Wand2 size={18} />,
-    label: 'HeyGen',
-    desc: 'AI video generation pipeline',
-    accent: '#8b5cf6',
-    route: '/heygen',
   },
   {
     href: '/outreach',
