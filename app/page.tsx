@@ -50,7 +50,7 @@ export default function LandingPage() {
   return (
     <div className="landing">
       <nav className="landing-nav">
-        <div className="landing-nav-logo">Opernox</div>
+        <div className="landing-logo"><span>Opernox</span></div>
         <div className="landing-nav-links">
           <a href="#features">Features</a>
           <Link href="/login">

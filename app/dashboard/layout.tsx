@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Megaphone,
   Users,
-  MessageSquare,
   Inbox,
   LogOut,
   Zap,
@@ -15,14 +14,13 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: <LayoutDashboard /> },
-  { href: '/campaigns', label: 'Campaigns', icon: <Megaphone /> },
-  { href: '/accounts', label: 'Accounts', icon: <Users /> },
-  { href: '/leads', label: 'Leads', icon: <Users /> },
-  { href: '/replies', label: 'Replies', icon: <Inbox /> },
+  { href: '/dashboard', label: 'Overview', icon: <LayoutDashboard size={16} /> },
+  { href: '/campaigns', label: 'Campaigns', icon: <Megaphone size={16} /> },
+  { href: '/accounts', label: 'Accounts', icon: <Users size={16} /> },
+  { href: '/leads', label: 'Leads', icon: <Users size={16} /> },
+  { href: '/replies', label: 'Replies', icon: <Inbox size={16} /> },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -45,117 +43,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     return (
-      <div className="loading-page">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div className="spinner" style={{ width: 32, height: 32 }} />
       </div>
     );
   }
 
   return (
-    <>
+    <div className="app-shell">
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
+        <div className="sidebar-top">
+          <div className="sidebar-logo">
+            Opernox<span>Platform</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-item ${pathname === item.href ? 'nav-item--active' : ''}`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div style={{ padding: '0 12px', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.email?.split('@')[0]}
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.email}
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="nav-item"
+            style={{ width: '100%', color: 'var(--red)', opacity: 0.8 }}
+          >
+            <LogOut size={16} />
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+            zIndex: 99, display: 'none',
+          }}
+          className="mobile-overlay"
+        />
+      )}
+
       {/* Mobile toggle */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="btn btn-ghost btn-sm"
-        style={{
-          position: 'fixed',
-          top: '16px',
-          left: '16px',
-          zIndex: 200,
-          display: 'none',
-        }}
-        id="sidebar-toggle"
+        className="mobile-toggle"
+        aria-label="Toggle menu"
       >
         <Menu size={20} />
       </button>
 
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.6)',
-              zIndex: 150,
-              display: 'none',
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <div className="app-shell">
-        {/* Sidebar */}
-        <motion.aside
-          className={`sidebar ${sidebarOpen ? 'open' : ''}`}
-          initial={{ x: -240 }}
-          animate={{ x: 0 }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          style={{ zIndex: 160 }}
-        >
-          <div className="sidebar-logo">
-            <h1>Opernox</h1>
-            <span>AI Platform</span>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="btn btn-ghost btn-sm"
-              style={{ position: 'absolute', top: '20px', right: '12px', display: 'none' }}
-              id="sidebar-close"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <nav className="sidebar-nav">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={pathname === item.href ? 'active' : ''}
-                onClick={() => setSidebarOpen(false)}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="sidebar-footer">
-            <div style={{ padding: '0 14px', marginBottom: '12px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
-                {user.email?.split('@')[0]}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '2px' }}>
-                {user.email}
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="btn btn-ghost btn-sm"
-              style={{ width: '100%', justifyContent: 'flex-start' }}
-            >
-              <LogOut size={16} />
-              Sign out
-            </button>
-          </div>
-        </motion.aside>
-
-        {/* Main content */}
-        <main className="main-content">{children}</main>
+      {/* Main content */}
+      <div className="main-content">
+        {children}
       </div>
-
-      <style>{`
-        @media (max-width: 768px) {
-          #sidebar-toggle { display: flex !important; }
-          #sidebar-close { display: flex !important; }
-          .sidebar { transform: translateX(-100%); }
-          .sidebar.open { transform: translateX(0) !important; }
-          .main-content { margin-left: 0 !important; }
-        }
-      `}</style>
-    </>
+    </div>
   );
 }

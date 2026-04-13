@@ -50,7 +50,7 @@ function LoginForm() {
   return (
     <div className="auth-card">
       <div className="auth-logo">
-        <h1>Opernox</h1>
+        <h1>Opernox<span>Platform</span></h1>
         <p>{isSignup ? 'Create your account' : 'Welcome back'}</p>
       </div>
 
