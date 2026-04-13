@@ -1,6 +1,6 @@
 /**
  * PATCH /api/admin/profiles/[id]
- * Update payment_status for a user
+ * Update payment_status and/or wire_notes for a user
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -11,7 +11,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { payment_status } = body;
+  const { payment_status, wire_notes } = body;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujdegmhsvwymxzezwwna.supabase.co',
@@ -19,14 +19,21 @@ export async function PATCH(
     { auth: { persistSession: false } }
   );
 
-  const validStatuses = ['pending_wire', 'paid', 'vps_approved', 'vps_active'];
-  if (!validStatuses.includes(payment_status)) {
-    return NextResponse.json({ error: 'Invalid payment_status' }, { status: 400 });
+  const updates: Record<string, unknown> = {};
+  if (payment_status !== undefined) {
+    const valid = ['pending_wire', 'paid', 'vps_approved', 'vps_active'];
+    if (!valid.includes(payment_status)) {
+      return NextResponse.json({ error: 'Invalid payment_status' }, { status: 400 });
+    }
+    updates.payment_status = payment_status;
+  }
+  if (wire_notes !== undefined) {
+    updates.wire_notes = wire_notes;
   }
 
   const { data, error } = await supabase
     .from('profiles')
-    .update({ payment_status })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();
