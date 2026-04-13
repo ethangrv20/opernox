@@ -80,6 +80,13 @@ input, textarea, select { font-family: inherit; }
   flex-shrink: 0;
 }
 
+.sidebar-logo-link {
+  display: block;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.sidebar-logo-link:hover { opacity: 0.8; }
+
 .sidebar-logo {
   font-size: 17px;
   font-weight: 900;
@@ -147,6 +154,38 @@ input, textarea, select { font-family: inherit; }
   padding: 12px 8px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-user {
+  padding: 0 12px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.sidebar-user-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-user-email {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.loading-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
 }
 
 /* ---- Main content ---- */

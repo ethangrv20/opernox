@@ -1,26 +1,31 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Megaphone,
-  Users,
-  Inbox,
+  Video,
+  Twitter,
+  Linkedin,
+  Music,
+  Wand2,
+  Send,
+  Settings,
   LogOut,
-  Zap,
   Menu,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: <LayoutDashboard size={16} /> },
-  { href: '/campaigns', label: 'Campaigns', icon: <Megaphone size={16} /> },
-  { href: '/accounts', label: 'Accounts', icon: <Users size={16} /> },
-  { href: '/leads', label: 'Leads', icon: <Users size={16} /> },
-  { href: '/replies', label: 'Replies', icon: <Inbox size={16} /> },
+const NAV_ITEMS = [
+  { href: '/dashboard',   label: 'Overview',    icon: <LayoutDashboard size={16} /> },
+  { href: '/ugc',         label: 'UGC System',   icon: <Video size={16} /> },
+  { href: '/x-system',    label: 'X System',      icon: <Twitter size={16} /> },
+  { href: '/linkedin',    label: 'LinkedIn',      icon: <Linkedin size={16} /> },
+  { href: '/tiktok',      label: 'TikTok',        icon: <Music size={16} /> },
+  { href: '/heygen',      label: 'HeyGen',         icon: <Wand2 size={16} /> },
+  { href: '/outreach',    label: 'IG Outreach',   icon: <Send size={16} /> },
+  { href: '/client-config', label: 'Client Config', icon: <Settings size={16} /> },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -43,7 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="loading-page">
         <div className="spinner" style={{ width: 32, height: 32 }} />
       </div>
     );
@@ -54,13 +59,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar-top">
-          <div className="sidebar-logo">
-            Opernox<span>Platform</span>
-          </div>
+          <Link href="/dashboard" className="sidebar-logo-link">
+            <div className="sidebar-logo">Opernox<span>Platform</span></div>
+          </Link>
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -74,20 +79,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         <div className="sidebar-footer">
-          <div style={{ padding: '0 12px', marginBottom: '10px' }}>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user.email?.split('@')[0]}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user.email}
-            </div>
+          <div className="sidebar-user">
+            <div className="sidebar-user-name">{user.email?.split('@')[0]}</div>
+            <div className="sidebar-user-email">{user.email}</div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="nav-item"
-            style={{ width: '100%', color: 'var(--red)', opacity: 0.8 }}
-          >
-            <LogOut size={16} />
+          <button onClick={handleLogout} className="nav-item" style={{ color: 'var(--red)', opacity: 0.8 }}>
+            <LogOut size={15} />
             Sign out
           </button>
         </div>
@@ -96,22 +93,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
-            zIndex: 99, display: 'none',
-          }}
           className="mobile-overlay"
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Mobile toggle */}
       <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
         className="mobile-toggle"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
         aria-label="Toggle menu"
       >
-        <Menu size={20} />
+        {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
       </button>
 
       {/* Main content */}
