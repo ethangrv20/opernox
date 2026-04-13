@@ -76,6 +76,8 @@ export default function OutreachPage() {
     message_template: 'Hey {{name}}! I came across your profile and thought we could collaborate.',
     goal: 'Book a discovery call',
     offer_summary: '',
+    ai_persona: '',
+    escalation_keywords: '',
   });
 
   const [newLeadsText, setNewLeadsText] = useState('');
@@ -144,7 +146,7 @@ export default function OutreachPage() {
       if (d.success) {
         setCampaigns(cs => [...cs, { ...d.campaign, dms_sent: 0, leads_total: 0, leads_contacted: 0, replies_received: 0 }]);
         setShowCreate(false);
-        setNewCampaign({ name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '' });
+        setNewCampaign({ name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '' });
         showToast('ok', 'Campaign created');
       } else {
         showToast('error', d.error || 'Failed to create');
@@ -550,6 +552,15 @@ export default function OutreachPage() {
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Offer Summary</div>
                     <textarea value={newCampaign.offer_summary} onChange={e => setNewCampaign(c => ({ ...c, offer_summary: e.target.value }))} rows={2} placeholder="Brief description of what you are offering..." style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>AI Persona <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(how the AI talks)</span></div>
+                    <textarea value={newCampaign.ai_persona} onChange={e => setNewCampaign(c => ({ ...c, ai_persona: e.target.value }))} rows={3} placeholder="e.g. Friendly, professional, never pushy. Talks like a trusted advisor. Asks questions before pitching anything." style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 5 }}>Escalation Keywords <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(comma-separated)</span></div>
+                    <input value={newCampaign.escalation_keywords} onChange={e => setNewCampaign(c => ({ ...c, escalation_keywords: e.target.value }))} placeholder="e.g. interested, let's talk, book, schedule, yes" style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: 3 }}>If any of these words appear in a reply, it is flagged for human review</div>
                   </div>
                   <button onClick={createCampaign} style={{ padding: '10px', background: ACCENT, border: 'none', borderRadius: 6, color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                     Create Campaign
