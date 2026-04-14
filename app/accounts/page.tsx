@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getMcUrl } from '@/lib/mc-url';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,6 +26,7 @@ interface Account {
   warmup_completed: boolean;
   daily_limit: number;
   created_at: string;
+  warmup_auto?: boolean; // loaded from schedule
 }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -315,12 +316,71 @@ function AccountModal({
   );
 }
 
+// ─── Auto Warmup Toggle (IG accounts only) ────────────────────────────────────
+function AutoWarmupToggle({
+  profileId,
+  mcUrl,
+  enabled,
+  onToggle,
+}: {
+  profileId: string;
+  mcUrl: string;
+  enabled: boolean;
+  onToggle: (nowEnabled: boolean) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  const toggle = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const next = !enabled;
+      const res = await fetch(mcUrl + '/api/ig/warmup/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, enabled: next }),
+      });
+      const data = await res.json();
+      if (data.success) onToggle(next);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Auto</div>
+      <button
+        onClick={toggle}
+        disabled={loading}
+        style={{
+          width: 36, height: 20, borderRadius: 99, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+          background: enabled ? '#10b981' : 'var(--surface-3)',
+          transition: 'background 0.2s', position: 'relative', flexShrink: 0,
+          opacity: loading ? 0.7 : 1,
+        }}
+        title={enabled ? 'Auto warmup ON — VPS runs it daily' : 'Auto warmup OFF — enable to automate'}
+      >
+        <div style={{
+          width: 14, height: 14, borderRadius: '50%', background: 'white',
+          position: 'absolute', top: 3, transition: 'left 0.2s',
+          left: enabled ? 17 : 3,
+        }} />
+      </button>
+      <span style={{ fontSize: 10, color: enabled ? '#10b981' : 'var(--text-3)', fontWeight: 600 }}>
+        {enabled ? 'ON — daily' : 'OFF'}
+      </span>
+    </div>
+  );
+}
+
 // ─── Account Card ─────────────────────────────────────────────────────────────
-function AccountCard({ account, onEdit, onDelete, mcUrl }: {
+function AccountCard({ account, onEdit, onDelete, mcUrl, warmupSched, onRefreshSchedule }: {
   account: Account;
   onEdit: () => void;
   onDelete: () => void;
   mcUrl: string;
+  warmupSched: Record<string, { enabled: boolean }>;
+  onRefreshSchedule: () => void;
 }) {
   const sinfo = systemInfo(account.account_system as AccountSystem);
   const days = account.warmup_days_completed ?? getDaysActive(account.warmup_start_date);
@@ -384,6 +444,12 @@ function AccountCard({ account, onEdit, onDelete, mcUrl }: {
                 ))}
               </div>
               <RunWarmupBtn account={account} mcUrl={mcUrl} />
+              <AutoWarmupToggle
+                profileId={account.adspower_id}
+                mcUrl={mcUrl}
+                enabled={!!warmupSched[account.adspower_id]?.enabled}
+                onToggle={() => onRefreshSchedule()}
+              />
             </>
           )}
         </div>
@@ -412,6 +478,17 @@ export default function AccountsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | undefined>();
   const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
+  const [warmupSched, setWarmupSched] = useState<Record<string, { enabled: boolean; last_run_iso?: string }>>({});
+
+  const fetchWarmupSchedule = useCallback(async (url: string) => {
+    try {
+      const res = await fetch(url + '/api/ig/warmup/schedule');
+      if (res.ok) {
+        const data = await res.json();
+        setWarmupSched(data as Record<string, { enabled: boolean; last_run_iso?: string }>);
+      }
+    } catch { /* MC not reachable */ }
+  }, []);
 
   const fetchAccounts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -428,8 +505,11 @@ export default function AccountsPage() {
   useEffect(() => { fetchAccounts(); }, []);
 
   useEffect(() => {
-    getMcUrl().then(setMcUrl);
-  }, []);
+    getMcUrl().then(url => {
+      setMcUrl(url);
+      fetchWarmupSchedule(url);
+    });
+  }, [fetchWarmupSchedule]);
 
   const deleteAccount = async (id: string) => {
     if (!confirm('Remove this account? This cannot be undone.')) return;
@@ -497,6 +577,8 @@ export default function AccountsPage() {
                   onEdit={() => { setEditAccount(a); setShowAdd(true); }}
                   onDelete={() => deleteAccount(a.id)}
                   mcUrl={mcUrl}
+                  warmupSched={warmupSched}
+                  onRefreshSchedule={() => fetchWarmupSchedule(mcUrl)}
                 />
               </div>
             ))}
