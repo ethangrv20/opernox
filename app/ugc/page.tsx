@@ -66,7 +66,7 @@ export default function UGCPase() {
     try {
       const [autoRes, accRes] = await Promise.all([
         fetch(MC + '/api/instagram/auto-post').then(r => r.json()),
-        fetch(MC + '/api/outreach/accounts').then(r => r.json()),
+        fetch(MC + '/api/ugc/accounts').then(r => r.json()),
       ]);
       if (autoRes.enabled !== undefined) {
         setAutoPost(prev => ({

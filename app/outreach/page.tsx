@@ -67,6 +67,18 @@ interface Stats {
   accounts: number;
 }
 
+interface SystemConfig {
+  tone?: string;
+  typing_style?: string;
+  slang_level?: string;
+  humor_level?: string;
+  reply_strategy?: string;
+  phrases_to_use?: string;
+  phrases_to_avoid?: string;
+  follow_up_days?: string;
+  max_follow_ups?: number;
+}
+
 export default function OutreachPage() {
   const [tab, setTab] = useState<'campaigns' | 'leads' | 'analytics'>('campaigns');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -79,6 +91,9 @@ export default function OutreachPage() {
   const [showAddLeads, setShowAddLeads] = useState(false);
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; msg: string } | null>(null);
   const [replyEngineRunning, setReplyEngineRunning] = useState(false);
+  const [systemConfigOpen, setSystemConfigOpen] = useState(false);
+  const [systemConfig, setSystemConfig] = useState<SystemConfig>({});
+  const [systemConfigSaving, setSystemConfigSaving] = useState(false);
 
   const [newCampaign, setNewCampaign] = useState({
     name: '',
@@ -107,6 +122,41 @@ export default function OutreachPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const loadSystemConfig = useCallback(async () => {
+    try {
+      const res = await fetch(MC + '/api/system-config?system=ig_outreach');
+      const data = await res.json();
+      if (data.config) {
+        setSystemConfig({
+          tone: data.config.tone || 'professional',
+          typing_style: data.config.typing_style || 'standard',
+          slang_level: data.config.slang_level || 'minimal',
+          humor_level: data.config.humor_level || 'light',
+          reply_strategy: data.config.reply_strategy || 'helpful',
+          phrases_to_use: data.config.phrases_to_use || '',
+          phrases_to_avoid: data.config.phrases_to_avoid || '',
+          follow_up_days: String(data.config.follow_up_days || 3),
+          max_follow_ups: data.config.max_follow_ups || 3,
+        });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const saveSystemConfig = async () => {
+    setSystemConfigSaving(true);
+    try {
+      const res = await fetch(MC + '/api/system-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: 'ig_outreach', ...systemConfig }),
+      });
+      const d = await res.json();
+      if (d.id || d.system) showToast('ok', 'System AI defaults saved');
+      else showToast('error', 'Failed to save — table may not exist. Run setup first.');
+    } catch { showToast('error', 'Could not reach MC server'); }
+    setSystemConfigSaving(false);
+  };
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -126,7 +176,7 @@ export default function OutreachPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadAll(); loadSystemConfig(); }, [loadAll, loadSystemConfig]);
 
   const runCampaign = async (id: string) => {
     try {
@@ -165,7 +215,9 @@ export default function OutreachPage() {
       if (d.success) {
         setCampaigns(cs => [...cs, { ...d.campaign, dms_sent: 0, leads_total: 0, leads_contacted: 0, replies_received: 0 }]);
         setShowCreate(false);
-        setNewCampaign({ name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '', tone: 'professional', typing_style: 'standard', slang_level: 'minimal', humor_level: 'light', phrases_to_use: '', phrases_to_avoid: '', reply_strategy: 'helpful', follow_up_days: '3', max_follow_ups: 3 });
+        // Pre-fill from system config for next new campaign
+        const defaults = { name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '', ...systemConfig };
+        setNewCampaign({ ...defaults, tone: systemConfig.tone || 'professional', typing_style: systemConfig.typing_style || 'standard', slang_level: systemConfig.slang_level || 'minimal', humor_level: systemConfig.humor_level || 'light', phrases_to_use: systemConfig.phrases_to_use || '', phrases_to_avoid: systemConfig.phrases_to_avoid || '', reply_strategy: systemConfig.reply_strategy || 'helpful', follow_up_days: systemConfig.follow_up_days || '3', max_follow_ups: systemConfig.max_follow_ups || 3 });
         showToast('ok', 'Campaign created');
       } else {
         showToast('error', d.error || 'Failed to create');
@@ -299,6 +351,110 @@ export default function OutreachPage() {
           ))}
         </div>
 
+        {/* System AI Defaults — IG Outreach */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginBottom: 14, overflow: 'hidden' }}>
+          <div onClick={() => setSystemConfigOpen(!systemConfigOpen)} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'rgba(124,58,237,0.05)', borderBottom: systemConfigOpen ? '1px solid var(--border)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 18, height: 18, borderRadius: 5, background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              </div>
+              <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.6px' }}>System AI Defaults — IG Outreach</span>
+              {systemConfig.tone && <span style={{ fontSize: '10px', color: 'var(--text-4)', fontWeight: 400 }}>({systemConfig.tone} · {systemConfig.reply_strategy})</span>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {!systemConfigOpen && (
+                <button onClick={(e) => { e.stopPropagation(); saveSystemConfig(); }} disabled={systemConfigSaving} style={{ padding: '3px 10px', borderRadius: 'var(--radius-sm)', background: '#8b5cf6', border: 'none', cursor: systemConfigSaving ? 'default' : 'pointer', fontSize: '10px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
+                  {systemConfigSaving ? 'Saving...' : 'Save'}
+                </button>
+              )}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" style={{ transform: systemConfigOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          {systemConfigOpen && (
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Tone / Typing Style / Slang */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Tone</div>
+                  <select value={systemConfig.tone || 'professional'} onChange={e => setSystemConfig(s => ({ ...s, tone: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                    <option value="professional">Professional</option>
+                    <option value="casual">Casual</option>
+                    <option value="friendly">Friendly</option>
+                    <option value="assertive">Assertive</option>
+                    <option value="aggressive">Aggressive</option>
+                    <option value="playful">Playful</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Typing Style</div>
+                  <select value={systemConfig.typing_style || 'standard'} onChange={e => setSystemConfig(s => ({ ...s, typing_style: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                    <option value="standard">Standard</option>
+                    <option value="gen_z">Gen Z — lol, brb, etc</option>
+                    <option value="all_lowercase">All lowercase</option>
+                    <option value="formal">Formal — proper punctuation</option>
+                    <option value="voice_notes">Voice note vibes</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Slang Level</div>
+                  <select value={systemConfig.slang_level || 'minimal'} onChange={e => setSystemConfig(s => ({ ...s, slang_level: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                    <option value="none">No slang</option>
+                    <option value="minimal">Minimal</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="heavy">Heavy slang</option>
+                  </select>
+                </div>
+              </div>
+              {/* Humor / Reply Strategy */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Humor Level</div>
+                  <select value={systemConfig.humor_level || 'light'} onChange={e => setSystemConfig(s => ({ ...s, humor_level: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                    <option value="none">No humor</option>
+                    <option value="light">Light — occasional jokes</option>
+                    <option value="moderate">Moderate — jokes welcome</option>
+                    <option value="heavy">Heavy — joke around freely</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Reply Strategy</div>
+                  <select value={systemConfig.reply_strategy || 'helpful'} onChange={e => setSystemConfig(s => ({ ...s, reply_strategy: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                    <option value="helpful">Helpful — answer questions first</option>
+                    <option value="direct">Direct — pitch early</option>
+                    <option value="storytelling">Storytelling — build curiosity</option>
+                    <option value="question_based">Question-based — ask to qualify</option>
+                  </select>
+                </div>
+              </div>
+              {/* Phrases to Use */}
+              <div>
+                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Phrases to USE <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(comma-separated)</span></div>
+                <input value={systemConfig.phrases_to_use || ''} onChange={e => setSystemConfig(s => ({ ...s, phrases_to_use: e.target.value }))} placeholder="e.g. game-changer, real talk, let me show you" style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              </div>
+              {/* Phrases to Avoid */}
+              <div>
+                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Phrases to AVOID <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(comma-separated)</span></div>
+                <input value={systemConfig.phrases_to_avoid || ''} onChange={e => setSystemConfig(s => ({ ...s, phrases_to_avoid: e.target.value }))} placeholder="e.g. ayo, idk, tbh, sounds spammy" style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              </div>
+              {/* Follow-up Schedule */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Follow-up After (days)</div>
+                  <input type="number" min="1" max="14" value={systemConfig.follow_up_days || '3'} onChange={e => setSystemConfig(s => ({ ...s, follow_up_days: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Max Follow-ups</div>
+                  <input type="number" min="1" max="5" value={systemConfig.max_follow_ups || 3} onChange={e => setSystemConfig(s => ({ ...s, max_follow_ups: parseInt(e.target.value) || 3 }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <button onClick={saveSystemConfig} disabled={systemConfigSaving} style={{ padding: '8px', background: '#8b5cf6', border: 'none', borderRadius: 6, color: 'white', fontSize: '12px', fontWeight: 700, cursor: systemConfigSaving ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                {systemConfigSaving ? 'Saving...' : 'Save System AI Defaults'}
+              </button>
+            </div>
+          )}
+        </motion.div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14, alignItems: 'start' }}>
           {/* Left */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -318,7 +474,7 @@ export default function OutreachPage() {
                   ))}
                 </div>
                 {tab === 'campaigns' && (
-                  <button onClick={() => setShowCreate(true)} style={{ marginRight: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
+                  <button onClick={() => { setNewCampaign(c => ({ name: '', account_id: '', message_template: c.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '', tone: systemConfig.tone || 'professional', typing_style: systemConfig.typing_style || 'standard', slang_level: systemConfig.slang_level || 'minimal', humor_level: systemConfig.humor_level || 'light', reply_strategy: systemConfig.reply_strategy || 'helpful', phrases_to_use: systemConfig.phrases_to_use || '', phrases_to_avoid: systemConfig.phrases_to_avoid || '', follow_up_days: systemConfig.follow_up_days || '3', max_follow_ups: systemConfig.max_follow_ups || 3 })); setShowCreate(true); }} style={{ marginRight: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
                     <Plus size={12} /> New Campaign
                   </button>
                 )}
@@ -337,7 +493,7 @@ export default function OutreachPage() {
                     <div style={{ textAlign: 'center', padding: '32px' }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>No campaigns yet</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-4)', marginBottom: 16 }}>Create your first campaign to start outreach</div>
-                      <button onClick={() => setShowCreate(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
+                      <button onClick={() => { setNewCampaign(c => ({ name: '', account_id: '', message_template: c.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '', tone: systemConfig.tone || 'professional', typing_style: systemConfig.typing_style || 'standard', slang_level: systemConfig.slang_level || 'minimal', humor_level: systemConfig.humor_level || 'light', reply_strategy: systemConfig.reply_strategy || 'helpful', phrases_to_use: systemConfig.phrases_to_use || '', phrases_to_avoid: systemConfig.phrases_to_avoid || '', follow_up_days: systemConfig.follow_up_days || '3', max_follow_ups: systemConfig.max_follow_ups || 3 })); setShowCreate(true); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
                         <Plus size={13} /> Create Campaign
                       </button>
                     </div>
