@@ -4,18 +4,16 @@ import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, X, Trash2, User, Instagram, Music, Linkedin, Twitter,
-  CheckCircle, AlertCircle, Globe, Zap, Filter, Layers, Send
+  CheckCircle, AlertCircle, Globe, Wifi, Loader2, RefreshCw, Send
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type Platform = 'instagram' | 'tiktok' | 'linkedin' | 'x';
-type AccountSystem = 'ugc' | 'outreach' | 'content' | 'scraper';
+type AccountSystem = 'ig_ugc' | 'ig_outreach' | 'tiktok_ugc' | 'x' | 'linkedin';
 
 interface Account {
   id: string;
   name: string;
   adspower_id: string;
-  platform: Platform;
   account_system: AccountSystem;
   proxy_host: string | null;
   proxy_port: number | null;
@@ -28,27 +26,32 @@ interface Account {
 }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
+const MC = 'http://127.0.0.1:3337';
 
-const PLATFORMS: { value: Platform; label: string; icon: React.ReactNode; color: string }[] = [
-  { value: 'instagram', label: 'Instagram',  icon: <Instagram size={13} />,  color: '#e1306c' },
-  { value: 'tiktok',    label: 'TikTok',      icon: <Music size={13} />,     color: '#ff0050' },
-  { value: 'linkedin',  label: 'LinkedIn',    icon: <Linkedin size={13} />, color: '#0a66c2' },
-  { value: 'x',         label: 'X',           icon: <Twitter size={13} />,  color: '#1da1f2' },
+const SYSTEMS: {
+  value: AccountSystem;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  platform_label: string;
+}[] = [
+  { value: 'ig_ugc',     label: 'IG UGC',      icon: <Instagram size={14} />, color: '#e1306c', platform_label: 'Instagram' },
+  { value: 'ig_outreach', label: 'IG Outreach', icon: <Send size={14} />,     color: '#fd1d83', platform_label: 'Instagram' },
+  { value: 'tiktok_ugc', label: 'TikTok UGC',  icon: <Music size={14} />,    color: '#ff0050', platform_label: 'TikTok' },
+  { value: 'x',          label: 'X',            icon: <Twitter size={14} />,  color: '#1da1f2', platform_label: 'X' },
+  { value: 'linkedin',   label: 'LinkedIn',    icon: <Linkedin size={14} />,  color: '#0a66c2', platform_label: 'LinkedIn' },
 ];
 
-const SYSTEMS: { value: AccountSystem; label: string; desc: string; icon: React.ReactNode }[] = [
-  { value: 'ugc',      label: 'UGC',       desc: 'Post videos & reels',          icon: <Layers size={12} /> },
-  { value: 'outreach', label: 'Outreach',  desc: 'DM leads & follow-ups',       icon: <Send size={12} /> },
-  { value: 'content',  label: 'Content',   desc: 'Feed posts & stories',        icon: <Zap size={12} /> },
-  { value: 'scraper',  label: 'Scraper',   desc: 'Data extraction & monitoring', icon: <Globe size={12} /> },
-];
-
-const STATUS_OPTIONS = ['active', 'paused', 'error'] as const;
+// Maps system → platform for Supabase storage
+const SYSTEM_TO_PLATFORM: Record<AccountSystem, string> = {
+  ig_ugc:     'instagram',
+  ig_outreach: 'instagram',
+  tiktok_ugc: 'tiktok',
+  x:          'x',
+  linkedin:   'linkedin',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function platformInfo(p: Platform) {
-  return PLATFORMS.find(x => x.value === p) ?? PLATFORMS[0];
-}
 function systemInfo(s: AccountSystem) {
   return SYSTEMS.find(x => x.value === s) ?? SYSTEMS[0];
 }
@@ -58,6 +61,74 @@ function getDaysActive(startDate: string | null) {
 }
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ─── Test Connection ──────────────────────────────────────────────────────────
+type TestStatus = 'idle' | 'testing' | 'ok' | 'fail';
+
+function TestConnectionBtn({
+  adspower_id,
+  proxy_host,
+  proxy_port,
+  proxy_user,
+  proxy_pass,
+}: {
+  adspower_id: string;
+  proxy_host: string;
+  proxy_port: string | number;
+  proxy_user: string;
+  proxy_pass: string;
+}) {
+  const [status, setStatus] = useState<TestStatus>('idle');
+  const [msg, setMsg] = useState('');
+
+  const test = async () => {
+    if (!adspower_id.trim()) { setMsg('Enter AdsPower ID first'); setStatus('fail'); return; }
+    setStatus('testing');
+    setMsg('');
+    try {
+      const res = await fetch(MC + '/api/adspower/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile_id: adspower_id.trim(),
+          proxy_host: proxy_host.trim() || undefined,
+          proxy_port: proxy_port ? parseInt(String(proxy_port)) : undefined,
+          proxy_user: proxy_user.trim() || undefined,
+          proxy_pass: proxy_pass || undefined,
+        }),
+      });
+      const d = await res.json();
+      if (d.success) { setStatus('ok'); setMsg(d.message || 'Connected!'); }
+      else { setStatus('fail'); setMsg(d.error || 'Connection failed'); }
+    } catch {
+      setStatus('fail'); setMsg('Cannot reach MC server');
+    }
+  };
+
+  return (
+    <div className="test-conn">
+      <button
+        type="button"
+        className={`test-conn__btn test-conn__btn--${status}`}
+        onClick={test}
+        disabled={status === 'testing'}
+      >
+        {status === 'testing' ? (
+          <><Loader2 size={12} className="spin" /> Testing...</>
+        ) : status === 'ok' ? (
+          <><CheckCircle size={12} /> Connected</>
+        ) : status === 'fail' ? (
+          <><AlertCircle size={12} /> Failed — Retry</>
+        ) : (
+          <><Wifi size={12} /> Test Connection</>
+        )}
+      </button>
+      {msg && (
+        <span className={`test-conn__msg test-conn__msg--${status}`}>{msg}</span>
+      )}
+    </div>
+  );
 }
 
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
@@ -73,10 +144,9 @@ function AccountModal({
   const [form, setForm] = useState({
     name: existing?.name ?? '',
     adspower_id: existing?.adspower_id ?? '',
-    platform: existing?.platform ?? ('instagram' as Platform),
-    account_system: existing?.account_system ?? ('ugc' as AccountSystem),
+    account_system: existing?.account_system ?? ('ig_ugc' as AccountSystem),
     proxy_host: existing?.proxy_host ?? '',
-    proxy_port: existing?.proxy_port ?? '',
+    proxy_port: String(existing?.proxy_port ?? ''),
     proxy_user: existing?.proxy_user ?? '',
     proxy_pass: '',
   });
@@ -100,7 +170,7 @@ function AccountModal({
         user_id: user.id,
         name: form.name,
         adspower_id: form.adspower_id,
-        platform: form.platform,
+        platform: SYSTEM_TO_PLATFORM[form.account_system],
         account_system: form.account_system,
         proxy_host: form.proxy_host || null,
         proxy_port: form.proxy_port ? parseInt(String(form.proxy_port)) : null,
@@ -126,7 +196,7 @@ function AccountModal({
     }
   };
 
-  const platform = platformInfo(form.platform);
+  const sinfo = systemInfo(form.account_system);
 
   return (
     <div className="acc-overlay" onClick={onClose}>
@@ -139,45 +209,32 @@ function AccountModal({
       >
         <div className="acc-modal__hd">
           <h3>{existing ? 'Edit Account' : 'Add Account'}</h3>
-          <button className="acc-modal__close" onClick={onClose}><X size={15} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="sys-badge" style={{ color: sinfo.color, background: sinfo.color + '18', borderColor: sinfo.color + '35' }}>
+              {sinfo.icon} {sinfo.label}
+            </div>
+            <button className="acc-modal__close" onClick={onClose}><X size={15} /></button>
+          </div>
         </div>
 
         {error && <div className="auth-err" style={{ margin: '0 20px 14px' }}>{error}</div>}
 
         <form className="acc-modal__body" onSubmit={handleSubmit}>
 
-          {/* Platform */}
-          <div className="field">
-            <label className="field-label">Platform</label>
-            <div className="platform-row">
-              {PLATFORMS.map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setForm(f => ({ ...f, platform: p.value }))}
-                  className={`platform-btn ${form.platform === p.value ? 'platform-btn--active' : ''}`}
-                  style={{ '--p-color': p.color } as React.CSSProperties}
-                >
-                  {p.icon}<span>{p.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* System */}
+          {/* System selector — the ONE choice */}
           <div className="field">
             <label className="field-label">System</label>
-            <div className="system-grid">
+            <div className="sys-grid">
               {SYSTEMS.map(s => (
                 <button
                   key={s.value}
                   type="button"
                   onClick={() => setForm(f => ({ ...f, account_system: s.value }))}
-                  className={`system-btn ${form.account_system === s.value ? 'system-btn--active' : ''}`}
+                  className={`sys-btn ${form.account_system === s.value ? 'sys-btn--active' : ''}`}
+                  style={{ '--s-color': s.color } as React.CSSProperties}
                 >
-                  <span className="system-btn__icon">{s.icon}</span>
-                  <span className="system-btn__label">{s.label}</span>
-                  <span className="system-btn__desc">{s.desc}</span>
+                  <span className="sys-btn__icon">{s.icon}</span>
+                  <span className="sys-btn__label">{s.label}</span>
                 </button>
               ))}
             </div>
@@ -185,17 +242,17 @@ function AccountModal({
 
           {/* Display name */}
           <div className="field">
-            <label className="field-label">Display name</label>
+            <label className="field-label">Display name <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(internal label)</span></label>
             <input
               className="field-input"
-              placeholder="e.g. Fitness Outreach or UGC Busness"
+              placeholder="e.g. Fitness UGC or Real Estate Outreach"
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               required
             />
           </div>
 
-          {/* AdsPower ID */}
+          {/* AdsPower ID + test */}
           <div className="field">
             <label className="field-label">AdsPower Profile ID</label>
             <input
@@ -205,20 +262,27 @@ function AccountModal({
               onChange={e => setForm(f => ({ ...f, adspower_id: e.target.value }))}
               required
             />
+            <TestConnectionBtn
+              adspower_id={form.adspower_id}
+              proxy_host={form.proxy_host}
+              proxy_port={form.proxy_port}
+              proxy_user={form.proxy_user}
+              proxy_pass={form.proxy_pass}
+            />
           </div>
 
           {/* Proxy */}
           <div className="field">
-            <label className="field-label">Proxy</label>
+            <label className="field-label">Proxy <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(optional but recommended)</span></label>
             <div className="field-row-2">
-              <input className="field-input" placeholder="Host" value={form.proxy_host}
+              <input className="field-input" placeholder="Host — e.g. 207.135.197.155" value={form.proxy_host}
                 onChange={e => setForm(f => ({ ...f, proxy_host: e.target.value }))} />
-              <input className="field-input" placeholder="Port" value={form.proxy_port}
+              <input className="field-input" placeholder="Port — e.g. 6096" value={form.proxy_port}
                 onChange={e => setForm(f => ({ ...f, proxy_port: e.target.value }))} />
             </div>
-            <input className="field-input" style={{ marginTop: 8 }} placeholder="Username (optional)" value={form.proxy_user}
+            <input className="field-input" style={{ marginTop: 8 }} placeholder="Username (if auth required)" value={form.proxy_user}
               onChange={e => setForm(f => ({ ...f, proxy_user: e.target.value }))} />
-            <input className="field-input" style={{ marginTop: 8 }} type="password" placeholder="Password (optional)" value={form.proxy_pass}
+            <input className="field-input" style={{ marginTop: 8 }} type="password" placeholder="Password (if auth required)" value={form.proxy_pass}
               onChange={e => setForm(f => ({ ...f, proxy_pass: e.target.value }))} />
           </div>
 
@@ -240,10 +304,9 @@ function AccountCard({ account, onEdit, onDelete }: {
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const pinfo = platformInfo(account.platform);
-  const sinfo = systemInfo(account.account_system);
+  const sinfo = systemInfo(account.account_system as AccountSystem);
   const days = getDaysActive(account.warmup_start_date);
-  const isIg = account.platform === 'instagram';
+  const isIg = account.account_system === 'ig_ugc' || account.account_system === 'ig_outreach';
 
   return (
     <motion.div
@@ -253,8 +316,8 @@ function AccountCard({ account, onEdit, onDelete }: {
     >
       {/* Header */}
       <div className="acc-card__head">
-        <div className="acc-card__icon" style={{ background: pinfo.color + '20', borderColor: pinfo.color + '40', color: pinfo.color }}>
-          {pinfo.icon}
+        <div className="acc-card__icon" style={{ background: sinfo.color + '20', borderColor: sinfo.color + '40', color: sinfo.color }}>
+          {sinfo.icon}
         </div>
         <div className="acc-card__info">
           <div className="acc-card__name">{account.name}</div>
@@ -268,24 +331,23 @@ function AccountCard({ account, onEdit, onDelete }: {
 
       {/* Tags */}
       <div className="acc-card__tags">
-        <span className="acc-tag" style={{ color: pinfo.color, background: pinfo.color + '15', borderColor: pinfo.color + '30' }}>
-          {pinfo.icon} {pinfo.label}
-        </span>
-        <span className="acc-tag acc-tag--sys">
+        <span className="acc-tag" style={{ color: sinfo.color, background: sinfo.color + '14', borderColor: sinfo.color + '30' }}>
           {sinfo.icon} {sinfo.label}
         </span>
-        {account.proxy_host && (
+        {account.proxy_host ? (
           <span className="acc-tag acc-tag--proxy">
             <Globe size={10} /> {account.proxy_host}:{account.proxy_port}
           </span>
+        ) : (
+          <span className="acc-tag acc-tag--nopxy">No proxy</span>
         )}
       </div>
 
-      {/* Stats — Instagram only */}
+      {/* Stats */}
       {isIg && (
         <div className="acc-card__stats">
           <div className="acc-stat">
-            <div className="acc-stat__num" style={{ color: pinfo.color }}>Day {Math.min(days + 1, 40)}</div>
+            <div className="acc-stat__num" style={{ color: sinfo.color }}>Day {Math.min(days + 1, 40)}</div>
             <div className="acc-stat__label">Warmup</div>
           </div>
           <div className="acc-stat__sep" />
@@ -301,21 +363,21 @@ function AccountCard({ account, onEdit, onDelete }: {
 
       {/* Actions */}
       <div className="acc-card__actions">
-        <button className="btn btn-ghost btn-sm" onClick={onEdit}>Edit</button>
-        <button className="btn btn-danger-ghost btn-sm" onClick={onDelete}><Trash2 size={12} /> Remove</button>
+        <button className="btn btn-ghost btn-sm" onClick={onEdit}>
+          <RefreshCw size={11} /> Edit
+        </button>
+        <button className="btn btn-danger-ghost btn-sm" onClick={onDelete}>
+          <Trash2 size={12} /> Remove
+        </button>
       </div>
     </motion.div>
   );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-const ALL_TAB = 'all' as const;
-type TabValue = typeof ALL_TAB | Platform;
-
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabValue>(ALL_TAB);
   const [showAdd, setShowAdd] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | undefined>();
 
@@ -339,12 +401,10 @@ export default function AccountsPage() {
     fetchAccounts();
   };
 
-  const filtered = tab === ALL_TAB ? accounts : accounts.filter(a => a.platform === tab);
-
-  const counts = PLATFORMS.reduce((acc, p) => {
-    acc[p.value] = accounts.filter(a => a.platform === p.value).length;
+  const counts = SYSTEMS.reduce((acc, s) => {
+    acc[s.value] = accounts.filter(a => a.account_system === s.value).length;
     return acc;
-  }, {} as Record<Platform, number>);
+  }, {} as Record<AccountSystem, number>);
 
   return (
     <div>
@@ -356,26 +416,24 @@ export default function AccountsPage() {
       </div>
 
       <div className="page-content">
-        {/* Platform filter tabs */}
+
+        {/* System filter tabs */}
         <div className="acc-tabs">
           <div className="acc-tabs__filter">
-            <Filter size={13} style={{ color: 'var(--text-3)' }} />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             <span className="acc-tabs__filter-label">Filter</span>
           </div>
-          <button
-            onClick={() => setTab(ALL_TAB)}
-            className={`acc-tab ${tab === ALL_TAB ? 'acc-tab--active' : ''}`}
-          >
+          <button onClick={() => {}} className={`acc-tab acc-tab--active`} style={{ '--tab-color': '#8b5cf6' } as React.CSSProperties}>
             All ({accounts.length})
           </button>
-          {PLATFORMS.map(p => (
+          {SYSTEMS.map(s => (
             <button
-              key={p.value}
-              onClick={() => setTab(p.value)}
-              className={`acc-tab ${tab === p.value ? 'acc-tab--active' : ''}`}
-              style={{ '--tab-color': p.color } as React.CSSProperties}
+              key={s.value}
+              onClick={() => {}}
+              className={`acc-tab`}
+              style={{ '--tab-color': s.color } as React.CSSProperties}
             >
-              {p.icon} {p.label} ({counts[p.value] ?? 0})
+              {s.icon} {s.label} ({counts[s.value] ?? 0})
             </button>
           ))}
         </div>
@@ -385,22 +443,18 @@ export default function AccountsPage() {
           <div className="acc-loading">
             <div className="spinner" style={{ width: 26, height: 26 }} />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : accounts.length === 0 ? (
           <div className="empty">
             <div className="empty-icon"><User size={22} /></div>
-            <h3>No accounts {tab !== ALL_TAB ? `for ${platformInfo(tab as Platform).label}` : 'yet'}</h3>
-            <p>
-              {tab !== ALL_TAB
-                ? `Add a ${platformInfo(tab as Platform).label} account to get started.`
-                : 'Add your first AdsPower account to connect a platform.'}
-            </p>
+            <h3>No accounts yet</h3>
+            <p>Add your first AdsPower account to connect a platform system.</p>
             <button className="btn btn-primary" onClick={() => { setEditAccount(undefined); setShowAdd(true); }}>
               <Plus size={14} /> Add account
             </button>
           </div>
         ) : (
           <div className="acc-grid">
-            {filtered.map((a, i) => (
+            {accounts.map((a, i) => (
               <div key={a.id} style={{ animationDelay: `${i * 50}ms` }}>
                 <AccountCard
                   account={a}
@@ -436,7 +490,7 @@ export default function AccountsPage() {
           background: var(--surface);
           border: 1px solid var(--border);
           border-radius: 16px;
-          width: 100%; max-width: 500px;
+          width: 100%; max-width: 480px;
           max-height: 92vh;
           display: flex; flex-direction: column;
           overflow: hidden;
@@ -453,29 +507,37 @@ export default function AccountsPage() {
         .acc-modal__foot { display: flex; gap: 10px; padding-top: 4px; }
         .acc-modal__foot .btn { flex: 1; justify-content: center; }
 
+        /* ── System badge (shown after selection) ── */
+        .sys-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99; font-size: 11.5px; font-weight: 700; border: 1px solid; }
+
         /* ── Fields ── */
         .field { display: flex; flex-direction: column; gap: 7px; }
         .field-label { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
         .field-input { width: 100%; padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text-1); font-size: 13px; font-family: inherit; box-sizing: border-box; transition: border-color 0.15s; }
-        .field-input:focus { outline: none; border-color: var(--cyan); }
+        .field-input:focus { outline: none; border-color: #8b5cf6; }
         .field-input::placeholder { color: var(--text-4); }
-        .field-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .field-row-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
 
-        /* ── Platform selector ── */
-        .platform-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .platform-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 4px; border-radius: 10px; border: 1.5px solid var(--border); background: transparent; color: var(--text-3); cursor: pointer; font-size: 10.5px; font-weight: 700; transition: all 0.15s; font-family: inherit; }
-        .platform-btn:hover { border-color: var(--p-color, var(--border-2)); color: var(--p-color); }
-        .platform-btn--active { border-color: var(--p-color); background: color-mix(in srgb, var(--p-color) 12%, transparent); color: var(--p-color); }
+        /* ── System selector (the ONE choice) ── */
+        .sys-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .sys-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px; border-radius: 10px; border: 1.5px solid var(--border); background: transparent; color: var(--text-3); cursor: pointer; font-size: 10.5px; font-weight: 700; transition: all 0.15s; font-family: inherit; }
+        .sys-btn:hover { border-color: var(--s-color, var(--border-2)); color: var(--s-color); }
+        .sys-btn--active { border-color: var(--s-color); background: color-mix(in srgb, var(--s-color) 14%, transparent); color: var(--s-color); }
+        .sys-btn__icon { }
+        .sys-btn__label { }
 
-        /* ── System selector ── */
-        .system-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .system-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: transparent; cursor: pointer; text-align: left; transition: all 0.15s; font-family: inherit; }
-        .system-btn:hover { border-color: var(--border-2); background: var(--surface-2); }
-        .system-btn--active { border-color: var(--cyan); background: rgba(34,211,238,0.08); }
-        .system-btn__icon { color: var(--text-3); flex-shrink: 0; }
-        .system-btn--active .system-btn__icon { color: var(--cyan); }
-        .system-btn__label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-1); }
-        .system-btn__desc { display: block; font-size: 10.5px; color: var(--text-3); }
+        /* ── Test connection ── */
+        .test-conn { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+        .test-conn__btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 7px; border: 1.5px solid var(--border); background: transparent; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.15s; font-family: inherit; color: var(--text-2); }
+        .test-conn__btn:hover { border-color: var(--border-2); }
+        .test-conn__btn--testing { opacity: 0.7; cursor: default; }
+        .test-conn__btn--ok { border-color: #10b981; color: #10b981; background: rgba(16,185,129,0.08); }
+        .test-conn__btn--fail { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
+        .test-conn__msg { font-size: 11.5px; font-weight: 600; }
+        .test-conn__msg--ok { color: #10b981; }
+        .test-conn__msg--fail { color: #ef4444; }
+        .spin { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ── Spinner ── */
         .spinner-sm { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.2); border-top-color: black; border-radius: 50%; animation: spin 0.6s linear infinite; }
@@ -484,10 +546,10 @@ export default function AccountsPage() {
         /* ── Account Card ── */
         .acc-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 13px; }
         .acc-card__head { display: flex; align-items: center; gap: 12px; }
-        .acc-card__icon { width: 40px; height: 40px; border-radius: 11px; border: 1.5px solid; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .acc-card__icon { width: 42px; height: 42px; border-radius: 11px; border: 1.5px solid; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .acc-card__info { flex: 1; min-width: 0; }
         .acc-card__name { font-weight: 700; font-size: 14px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .acc-card__adspower { font-size: 11px; color: var(--text-3); font-family: monospace; }
+        .acc-card__adspower { font-size: 11px; color: var(--text-3); font-family: monospace; margin-top: 1px; }
 
         .acc-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99; font-size: 11px; font-weight: 600; flex-shrink: 0; }
         .acc-status__dot { width: 5px; height: 5px; border-radius: 50%; }
@@ -500,7 +562,7 @@ export default function AccountsPage() {
 
         .acc-card__tags { display: flex; flex-wrap: wrap; gap: 6px; }
         .acc-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99; font-size: 11.5px; font-weight: 600; border: 1px solid; }
-        .acc-tag--sys { color: var(--cyan); background: rgba(34,211,238,0.08); border-color: rgba(34,211,238,0.2); }
+        .acc-tag--nopxy { color: var(--text-4); background: var(--surface-2); border-color: var(--border); }
         .acc-tag--proxy { color: var(--text-3); background: var(--surface-2); border-color: var(--border); font-family: monospace; font-size: 11px; }
 
         .acc-card__stats { display: flex; align-items: center; gap: 0; background: var(--bg); border-radius: 8px; padding: 10px 14px; }
@@ -510,7 +572,6 @@ export default function AccountsPage() {
         .acc-stat__sep { width: 1px; height: 28px; background: var(--border); margin: 0 12px; }
 
         .acc-card__meta { font-size: 11px; color: var(--text-3); }
-
         .acc-card__actions { display: flex; gap: 8px; }
         .acc-card__actions .btn { flex: 1; justify-content: center; font-size: 12px; }
 
@@ -523,7 +584,7 @@ export default function AccountsPage() {
         .acc-tab--active { border-color: var(--tab-color, var(--text-2)); background: color-mix(in srgb, var(--tab-color, var(--text-2)) 12%, transparent); color: var(--tab-color, var(--text-2)); }
 
         /* ── Grid / loading / empty ── */
-        .acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+        .acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
         .acc-loading { display: flex; justify-content: center; padding: 80px; }
 
         .btn-sm { padding: 6px 12px !important; font-size: 12px !important; }

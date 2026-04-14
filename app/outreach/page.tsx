@@ -21,6 +21,16 @@ interface Campaign {
   leads_total?: number;
   leads_contacted?: number;
   replies_received?: number;
+  // AI Setter full config
+  tone?: string;
+  typing_style?: string;
+  slang_level?: string;
+  humor_level?: string;
+  phrases_to_use?: string;
+  phrases_to_avoid?: string;
+  reply_strategy?: string;
+  follow_up_days?: string;
+  max_follow_ups?: number;
 }
 
 interface IGAccount {
@@ -78,6 +88,15 @@ export default function OutreachPage() {
     offer_summary: '',
     ai_persona: '',
     escalation_keywords: '',
+    tone: 'professional',
+    typing_style: 'standard',
+    slang_level: 'minimal',
+    humor_level: 'light',
+    phrases_to_use: '',
+    phrases_to_avoid: '',
+    reply_strategy: 'helpful',
+    follow_up_days: '3',
+    max_follow_ups: 3,
   });
 
   const [newLeadsText, setNewLeadsText] = useState('');
@@ -146,7 +165,7 @@ export default function OutreachPage() {
       if (d.success) {
         setCampaigns(cs => [...cs, { ...d.campaign, dms_sent: 0, leads_total: 0, leads_contacted: 0, replies_received: 0 }]);
         setShowCreate(false);
-        setNewCampaign({ name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '' });
+        setNewCampaign({ name: '', account_id: '', message_template: newCampaign.message_template, goal: 'Book a discovery call', offer_summary: '', ai_persona: '', escalation_keywords: '', tone: 'professional', typing_style: 'standard', slang_level: 'minimal', humor_level: 'light', phrases_to_use: '', phrases_to_avoid: '', reply_strategy: 'helpful', follow_up_days: '3', max_follow_ups: 3 });
         showToast('ok', 'Campaign created');
       } else {
         showToast('error', d.error || 'Failed to create');
@@ -562,6 +581,97 @@ export default function OutreachPage() {
                     <input value={newCampaign.escalation_keywords} onChange={e => setNewCampaign(c => ({ ...c, escalation_keywords: e.target.value }))} placeholder="e.g. interested, let's talk, book, schedule, yes" style={{ width: '100%', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
                     <div style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: 3 }}>If any of these words appear in a reply, it is flagged for human review</div>
                   </div>
+
+                  {/* ── AI SETTER CONFIG ── */}
+                  <div style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: 5, background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      </div>
+                      <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.6px' }}>AI Setter Config</span>
+                    </div>
+
+                    {/* Tone / Typing Style / Slang */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Tone</div>
+                        <select value={newCampaign.tone} onChange={e => setNewCampaign(c => ({ ...c, tone: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                          <option value="professional">Professional</option>
+                          <option value="casual">Casual</option>
+                          <option value="friendly">Friendly</option>
+                          <option value="assertive">Assertive</option>
+                          <option value="aggressive">Aggressive</option>
+                          <option value="playful">Playful</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Typing Style</div>
+                        <select value={newCampaign.typing_style} onChange={e => setNewCampaign(c => ({ ...c, typing_style: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                          <option value="standard">Standard</option>
+                          <option value="gen_z">Gen Z — lol, brb, etc</option>
+                          <option value="all_lowercase">All lowercase</option>
+                          <option value="formal">Formal — proper punctuation</option>
+                          <option value="voice_notes">Voice note vibes</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Slang Level</div>
+                        <select value={newCampaign.slang_level} onChange={e => setNewCampaign(c => ({ ...c, slang_level: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                          <option value="none">No slang</option>
+                          <option value="minimal">Minimal</option>
+                          <option value="moderate">Moderate</option>
+                          <option value="heavy">Heavy slang</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Humor / Reply Strategy */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Humor Level</div>
+                        <select value={newCampaign.humor_level} onChange={e => setNewCampaign(c => ({ ...c, humor_level: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                          <option value="none">No humor</option>
+                          <option value="light">Light — occasional jokes</option>
+                          <option value="moderate">Moderate — jokes welcome</option>
+                          <option value="heavy">Heavy — joke around freely</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Reply Strategy</div>
+                        <select value={newCampaign.reply_strategy} onChange={e => setNewCampaign(c => ({ ...c, reply_strategy: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
+                          <option value="helpful">Helpful — answer questions first</option>
+                          <option value="direct">Direct — pitch early</option>
+                          <option value="storytelling">Storytelling — build curiosity</option>
+                          <option value="question_based">Question-based — ask to qualify</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Phrases to Use */}
+                    <div>
+                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Phrases to USE <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(comma-separated)</span></div>
+                      <input value={newCampaign.phrases_to_use} onChange={e => setNewCampaign(c => ({ ...c, phrases_to_use: e.target.value }))} placeholder="e.g. game-changer, real talk, let me show you" style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    </div>
+
+                    {/* Phrases to Avoid */}
+                    <div>
+                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Phrases to AVOID <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(comma-separated)</span></div>
+                      <input value={newCampaign.phrases_to_avoid} onChange={e => setNewCampaign(c => ({ ...c, phrases_to_avoid: e.target.value }))} placeholder="e.g.ayo, idk, tbh, sounds spammy" style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                    </div>
+
+                    {/* Follow-up Schedule */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Follow-up After (days)</div>
+                        <input type="number" min="1" max="14" value={newCampaign.follow_up_days} onChange={e => setNewCampaign(c => ({ ...c, follow_up_days: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Max Follow-ups</div>
+                        <input type="number" min="1" max="5" value={newCampaign.max_follow_ups} onChange={e => setNewCampaign(c => ({ ...c, max_follow_ups: parseInt(e.target.value) || 3 }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                  </div>
+
                   <button onClick={createCampaign} style={{ padding: '10px', background: ACCENT, border: 'none', borderRadius: 6, color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                     Create Campaign
                   </button>
