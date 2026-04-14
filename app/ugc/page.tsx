@@ -102,7 +102,27 @@ export default function UGCPase() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { getMcUrl().then(setMcUrl); }, []);
+  useEffect(() => {
+    getMcUrl().then(url => {
+      setMcUrl(url);
+      // Load campaign schedule from VPS scheduler
+      fetch(url + '/api/campaigns/schedule')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          const igSc = data['ig_ugc'];
+          if (igSc) {
+            setAutoPost(prev => ({
+              ...prev,
+              enabled: igSc.enabled,
+              hourUtc: igSc.hour_utc || prev.hourUtc,
+              scenario: (igSc.scenario === 'B' ? 'B' : 'A') as 'A' | 'B',
+            }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, []);
 
   useEffect(() => {
     loadState();
@@ -115,6 +135,13 @@ export default function UGCPase() {
     setLoadingAuto(true);
     const newEnabled = !autoPost.enabled;
     try {
+      // Update the new scheduler endpoint (this is what the VPS cron uses)
+      await fetch(mcUrl + '/api/campaigns/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: 'ig_ugc', enabled: newEnabled, hour_utc: autoPost.hourUtc, scenario: autoPost.scenario }),
+      });
+      // Also update legacy state for backward compat
       const res = await fetch(mcUrl + '/api/instagram/auto-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,10 +150,8 @@ export default function UGCPase() {
       const data = await res.json();
       if (data.state) {
         setAutoPost(prev => ({ ...prev, enabled: data.state.enabled, hourUtc: data.state.hourUtc || prev.hourUtc }));
-        showToast('ok', newEnabled ? 'Auto-post enabled' : 'Auto-post disabled');
-      } else {
-        showToast('error', 'Failed to update');
       }
+      showToast('ok', newEnabled ? 'Auto-post enabled — runs daily at ' + autoPost.hourUtc + ':00 UTC' : 'Auto-post disabled');
     } catch {
       showToast('error', 'Connection error');
     }
@@ -135,11 +160,23 @@ export default function UGCPase() {
 
   const handleScenarioChange = (scenario: 'A' | 'B') => {
     setAutoPost(prev => ({ ...prev, scenario }));
+    // Persist scenario to scheduler
+    fetch(mcUrl + '/api/campaigns/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_id: 'ig_ugc', enabled: autoPost.enabled, hour_utc: autoPost.hourUtc, scenario }),
+    });
     showToast('ok', `Scenario ${scenario}: ${scenario === 'A' ? 'Same video to all accounts' : 'Different video per account'}`);
   };
 
   const handleScheduleChange = (hourUtc: number) => {
     setAutoPost(prev => ({ ...prev, hourUtc }));
+    // Persist hour to scheduler
+    fetch(mcUrl + '/api/campaigns/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_id: 'ig_ugc', enabled: autoPost.enabled, hour_utc: hourUtc, scenario: autoPost.scenario }),
+    });
   };
 
   const handleManualGenerate = async () => {
