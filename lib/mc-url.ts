@@ -8,23 +8,9 @@
 let cachedMcUrl: string | null = null;
 
 export async function getMcUrl(): Promise<string> {
-  if (cachedMcUrl) return cachedMcUrl;
-
-  try {
-    const res = await fetch('/api/client-vps', { credentials: 'include' });
-    if (res.ok) {
-      const vps = await res.json();
-      if (vps?.ip) {
-        cachedMcUrl = `http://${vps.ip}:3337`;
-        return cachedMcUrl;
-      }
-    }
-  } catch {
-    // VPS fetch failed — fall through to localhost
-  }
-
-  // Fallback for local dev or if no VPS yet
-  return 'http://127.0.0.1:3337';
+  // Skip cache on every call to avoid stale values persisting across page loads
+  // Return tunnel URL directly — bypass all DB lookups which fail in production
+  return process.env.NEXT_PUBLIC_MC_URL || 'https://exhibition-speaks-lucia-yet.trycloudflare.com';
 }
 
 export function clearMcUrlCache() {
