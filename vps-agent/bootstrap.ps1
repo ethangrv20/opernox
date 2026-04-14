@@ -231,7 +231,14 @@ try {
   Write-Log "VPS registration failed: $_" -Level "WARN"
 }
 
-# ── Step 10: Start PM2 and job-agent ─────────────────────────────────────────
+# ── Step 10: Re-enable Firewall with port 3337 open ─────────────────────────
+Write-Log "Re-enabling Windows Firewall with port 3337 open for Opernox dashboard..."
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+New-NetFirewallRule -DisplayName "Opernox MC API" -Direction Inbound -Action Allow `
+  -Protocol TCP -LocalPort 3337 -RemoteAddress Any -ErrorAction SilentlyContinue
+Write-Log "Firewall re-enabled. Port 3337 open to all sources."
+
+# ── Step 11: Start PM2 and job-agent ─────────────────────────────────────────
 Write-Log "Starting PM2 and mission-control..."
 
 # Create logs dir

@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, MessageSquare, Users, TrendingUp, Plug, Plus, Play, Pause, Trash2, X, CheckCircle, AlertCircle, Zap } from 'lucide-react';
+import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#ec4899';
-const MC = 'http://127.0.0.1:3337';
 
 interface Campaign {
   id: string;
@@ -94,6 +94,7 @@ export default function OutreachPage() {
   const [systemConfigOpen, setSystemConfigOpen] = useState(false);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({});
   const [systemConfigSaving, setSystemConfigSaving] = useState(false);
+  const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
 
   const [newCampaign, setNewCampaign] = useState({
     name: '',
@@ -124,7 +125,7 @@ export default function OutreachPage() {
 
   const loadSystemConfig = useCallback(async () => {
     try {
-      const res = await fetch(MC + '/api/system-config?system=ig_outreach');
+      const res = await fetch(mcUrl + '/api/system-config?system=ig_outreach');
       const data = await res.json();
       if (data.config) {
         setSystemConfig({
@@ -145,14 +146,14 @@ export default function OutreachPage() {
   const saveSystemConfig = async () => {
     setSystemConfigSaving(true);
     try {
-      const res = await fetch(MC + '/api/system-config', {
+      const res = await fetch(mcUrl + '/api/system-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ system: 'ig_outreach', ...systemConfig }),
       });
       const d = await res.json();
       if (d.id || d.system) showToast('ok', 'System AI defaults saved');
-      else showToast('error', 'Failed to save — table may not exist. Run setup first.');
+      else showToast('error', 'Failed to save â€” table may not exist. Run setup first.');
     } catch { showToast('error', 'Could not reach MC server'); }
     setSystemConfigSaving(false);
   };
@@ -161,11 +162,11 @@ export default function OutreachPage() {
     setLoading(true);
     try {
       const [cRes, aRes, lRes, repRes, sRes] = await Promise.all([
-        fetch(MC + '/api/outreach/campaigns').then(r => r.json()),
-        fetch(MC + '/api/outreach/accounts').then(r => r.json()),
-        fetch(MC + '/api/outreach/leads').then(r => r.json()),
-        fetch(MC + '/api/outreach/replies').then(r => r.json()),
-        fetch(MC + '/api/outreach/stats').then(r => r.json()),
+        fetch(mcUrl + '/api/outreach/campaigns').then(r => r.json()),
+        fetch(mcUrl + '/api/outreach/accounts').then(r => r.json()),
+        fetch(mcUrl + '/api/outreach/leads').then(r => r.json()),
+        fetch(mcUrl + '/api/outreach/replies').then(r => r.json()),
+        fetch(mcUrl + '/api/outreach/stats').then(r => r.json()),
       ]);
       setCampaigns(cRes.campaigns || []);
       setAccounts(aRes.accounts || []);
@@ -176,11 +177,13 @@ export default function OutreachPage() {
     setLoading(false);
   }, []);
 
+  useEffect(() => { getMcUrl().then(setMcUrl); }, []);
+
   useEffect(() => { loadAll(); loadSystemConfig(); }, [loadAll, loadSystemConfig]);
 
   const runCampaign = async (id: string) => {
     try {
-      const res = await fetch(MC + '/api/outreach/campaigns/' + id + '/run', { method: 'POST' });
+      const res = await fetch(mcUrl + '/api/outreach/campaigns/' + id + '/run', { method: 'POST' });
       const d = await res.json();
       showToast(d.success ? 'ok' : 'error', d.success ? 'Campaign launched!' : (d.error || 'Failed'));
     } catch { showToast('error', 'Could not reach MC server'); }
@@ -188,7 +191,7 @@ export default function OutreachPage() {
 
   const toggleCampaign = async (id: string) => {
     try {
-      const res = await fetch(MC + '/api/outreach/campaigns/' + id + '/toggle', { method: 'POST' });
+      const res = await fetch(mcUrl + '/api/outreach/campaigns/' + id + '/toggle', { method: 'POST' });
       const d = await res.json();
       if (d.success) setCampaigns(cs => cs.map(c => c.id === id ? { ...c, active: !c.active } : c));
     } catch { showToast('error', 'Could not reach MC server'); }
@@ -197,7 +200,7 @@ export default function OutreachPage() {
   const deleteCampaign = async (id: string) => {
     if (!confirm('Delete this campaign?')) return;
     try {
-      const res = await fetch(MC + '/api/outreach/campaigns/' + id, { method: 'DELETE' });
+      const res = await fetch(mcUrl + '/api/outreach/campaigns/' + id, { method: 'DELETE' });
       const d = await res.json();
       if (d.success) setCampaigns(cs => cs.filter(c => c.id !== id));
     } catch { showToast('error', 'Could not reach MC server'); }
@@ -206,7 +209,7 @@ export default function OutreachPage() {
   const createCampaign = async () => {
     if (!newCampaign.name.trim()) { showToast('error', 'Campaign name required'); return; }
     try {
-      const res = await fetch(MC + '/api/outreach/campaigns', {
+      const res = await fetch(mcUrl + '/api/outreach/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCampaign),
@@ -231,7 +234,7 @@ export default function OutreachPage() {
     if (usernames.length === 0) { showToast('error', 'No valid usernames'); return; }
     const firstAccount = accounts.find(a => a.id === newLeadsCampaign) || accounts[0];
     try {
-      const res = await fetch(MC + '/api/outreach/leads', {
+      const res = await fetch(mcUrl + '/api/outreach/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -254,7 +257,7 @@ export default function OutreachPage() {
   const triggerReplyEngine = async () => {
     setReplyEngineRunning(true);
     try {
-      const res = await fetch(MC + '/api/outreach/reply-engine', { method: 'POST' });
+      const res = await fetch(mcUrl + '/api/outreach/reply-engine', { method: 'POST' });
       const d = await res.json();
       if (d.success) { showToast('ok', 'Reply engine triggered'); loadAll(); }
       else showToast('error', d.error || 'Failed');
@@ -265,7 +268,7 @@ export default function OutreachPage() {
   const handleConnect = async () => {
     if (accounts.length === 0) { showToast('error', 'No IG accounts configured'); return; }
     try {
-      const res = await fetch(MC + '/api/ig/browser/open', {
+      const res = await fetch(mcUrl + '/api/ig/browser/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile_id: accounts[0].adspower_id }),
@@ -333,11 +336,11 @@ export default function OutreachPage() {
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 14 }}>
           {[
-            { icon: <Send size={13} />, val: loading ? '—' : stats.total_sent, label: 'DMs Sent', sub: 'All time' },
-            { icon: <TrendingUp size={13} />, val: loading ? '—' : stats.sent_today, label: 'Sent Today', sub: 'All accounts' },
-            { icon: <MessageSquare size={13} />, val: loading ? '—' : totalReplies, label: 'Replies', sub: 'Received' },
-            { icon: <AlertCircle size={13} />, val: loading ? '—' : escalatedCount, label: 'Escalated', sub: 'To human' },
-            { icon: <Users size={13} />, val: loading ? '—' : campaigns.filter(c => c.active).length, label: 'Active', sub: 'Campaigns' },
+            { icon: <Send size={13} />, val: loading ? 'â€”' : stats.total_sent, label: 'DMs Sent', sub: 'All time' },
+            { icon: <TrendingUp size={13} />, val: loading ? 'â€”' : stats.sent_today, label: 'Sent Today', sub: 'All accounts' },
+            { icon: <MessageSquare size={13} />, val: loading ? 'â€”' : totalReplies, label: 'Replies', sub: 'Received' },
+            { icon: <AlertCircle size={13} />, val: loading ? 'â€”' : escalatedCount, label: 'Escalated', sub: 'To human' },
+            { icon: <Users size={13} />, val: loading ? 'â€”' : campaigns.filter(c => c.active).length, label: 'Active', sub: 'Campaigns' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '13px' }}>
@@ -351,7 +354,7 @@ export default function OutreachPage() {
           ))}
         </div>
 
-        {/* System AI Defaults — IG Outreach */}
+        {/* System AI Defaults â€” IG Outreach */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginBottom: 14, overflow: 'hidden' }}>
           <div onClick={() => setSystemConfigOpen(!systemConfigOpen)} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: 'rgba(124,58,237,0.05)', borderBottom: systemConfigOpen ? '1px solid var(--border)' : 'none' }}>
@@ -359,8 +362,8 @@ export default function OutreachPage() {
               <div style={{ width: 18, height: 18, borderRadius: 5, background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
               </div>
-              <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.6px' }}>System AI Defaults — IG Outreach</span>
-              {systemConfig.tone && <span style={{ fontSize: '10px', color: 'var(--text-4)', fontWeight: 400 }}>({systemConfig.tone} · {systemConfig.reply_strategy})</span>}
+              <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.6px' }}>System AI Defaults â€” IG Outreach</span>
+              {systemConfig.tone && <span style={{ fontSize: '10px', color: 'var(--text-4)', fontWeight: 400 }}>({systemConfig.tone} Â· {systemConfig.reply_strategy})</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {!systemConfigOpen && (
@@ -390,9 +393,9 @@ export default function OutreachPage() {
                   <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Typing Style</div>
                   <select value={systemConfig.typing_style || 'standard'} onChange={e => setSystemConfig(s => ({ ...s, typing_style: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
                     <option value="standard">Standard</option>
-                    <option value="gen_z">Gen Z — lol, brb, etc</option>
+                    <option value="gen_z">Gen Z â€” lol, brb, etc</option>
                     <option value="all_lowercase">All lowercase</option>
-                    <option value="formal">Formal — proper punctuation</option>
+                    <option value="formal">Formal â€” proper punctuation</option>
                     <option value="voice_notes">Voice note vibes</option>
                   </select>
                 </div>
@@ -412,18 +415,18 @@ export default function OutreachPage() {
                   <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Humor Level</div>
                   <select value={systemConfig.humor_level || 'light'} onChange={e => setSystemConfig(s => ({ ...s, humor_level: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
                     <option value="none">No humor</option>
-                    <option value="light">Light — occasional jokes</option>
-                    <option value="moderate">Moderate — jokes welcome</option>
-                    <option value="heavy">Heavy — joke around freely</option>
+                    <option value="light">Light â€” occasional jokes</option>
+                    <option value="moderate">Moderate â€” jokes welcome</option>
+                    <option value="heavy">Heavy â€” joke around freely</option>
                   </select>
                 </div>
                 <div>
                   <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Reply Strategy</div>
                   <select value={systemConfig.reply_strategy || 'helpful'} onChange={e => setSystemConfig(s => ({ ...s, reply_strategy: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
-                    <option value="helpful">Helpful — answer questions first</option>
-                    <option value="direct">Direct — pitch early</option>
-                    <option value="storytelling">Storytelling — build curiosity</option>
-                    <option value="question_based">Question-based — ask to qualify</option>
+                    <option value="helpful">Helpful â€” answer questions first</option>
+                    <option value="direct">Direct â€” pitch early</option>
+                    <option value="storytelling">Storytelling â€” build curiosity</option>
+                    <option value="question_based">Question-based â€” ask to qualify</option>
                   </select>
                 </div>
               </div>
@@ -738,7 +741,7 @@ export default function OutreachPage() {
                     <div style={{ fontSize: '10px', color: 'var(--text-4)', marginTop: 3 }}>If any of these words appear in a reply, it is flagged for human review</div>
                   </div>
 
-                  {/* ── AI SETTER CONFIG ── */}
+                  {/* â”€â”€ AI SETTER CONFIG â”€â”€ */}
                   <div style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 18, height: 18, borderRadius: 5, background: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -764,9 +767,9 @@ export default function OutreachPage() {
                         <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Typing Style</div>
                         <select value={newCampaign.typing_style} onChange={e => setNewCampaign(c => ({ ...c, typing_style: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
                           <option value="standard">Standard</option>
-                          <option value="gen_z">Gen Z — lol, brb, etc</option>
+                          <option value="gen_z">Gen Z â€” lol, brb, etc</option>
                           <option value="all_lowercase">All lowercase</option>
-                          <option value="formal">Formal — proper punctuation</option>
+                          <option value="formal">Formal â€” proper punctuation</option>
                           <option value="voice_notes">Voice note vibes</option>
                         </select>
                       </div>
@@ -787,18 +790,18 @@ export default function OutreachPage() {
                         <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Humor Level</div>
                         <select value={newCampaign.humor_level} onChange={e => setNewCampaign(c => ({ ...c, humor_level: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
                           <option value="none">No humor</option>
-                          <option value="light">Light — occasional jokes</option>
-                          <option value="moderate">Moderate — jokes welcome</option>
-                          <option value="heavy">Heavy — joke around freely</option>
+                          <option value="light">Light â€” occasional jokes</option>
+                          <option value="moderate">Moderate â€” jokes welcome</option>
+                          <option value="heavy">Heavy â€” joke around freely</option>
                         </select>
                       </div>
                       <div>
                         <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>Reply Strategy</div>
                         <select value={newCampaign.reply_strategy} onChange={e => setNewCampaign(c => ({ ...c, reply_strategy: e.target.value }))} style={{ width: '100%', padding: '7px 9px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: '12px', fontFamily: 'inherit' }}>
-                          <option value="helpful">Helpful — answer questions first</option>
-                          <option value="direct">Direct — pitch early</option>
-                          <option value="storytelling">Storytelling — build curiosity</option>
-                          <option value="question_based">Question-based — ask to qualify</option>
+                          <option value="helpful">Helpful â€” answer questions first</option>
+                          <option value="direct">Direct â€” pitch early</option>
+                          <option value="storytelling">Storytelling â€” build curiosity</option>
+                          <option value="question_based">Question-based â€” ask to qualify</option>
                         </select>
                       </div>
                     </div>

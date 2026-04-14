@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getMcUrl } from '@/lib/mc-url';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, X, Trash2, User, Instagram, Music, Linkedin, Twitter,
@@ -26,7 +27,6 @@ interface Account {
 }
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const MC = 'http://127.0.0.1:3337';
 
 const SYSTEMS: {
   value: AccountSystem;
@@ -67,12 +67,14 @@ function formatDate(iso: string) {
 type TestStatus = 'idle' | 'testing' | 'ok' | 'fail';
 
 function TestConnectionBtn({
+  mcUrl,
   adspower_id,
   proxy_host,
   proxy_port,
   proxy_user,
   proxy_pass,
 }: {
+  mcUrl: string;
   adspower_id: string;
   proxy_host: string;
   proxy_port: string | number;
@@ -87,7 +89,7 @@ function TestConnectionBtn({
     setStatus('testing');
     setMsg('');
     try {
-      const res = await fetch(MC + '/api/adspower/test', {
+      const res = await fetch(mcUrl + '/api/adspower/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,10 +138,12 @@ function AccountModal({
   existing,
   onClose,
   onSaved,
+  mcUrl,
 }: {
   existing?: Account;
   onClose: () => void;
   onSaved: () => void;
+  mcUrl: string;
 }) {
   const [form, setForm] = useState({
     name: existing?.name ?? '',
@@ -263,6 +267,7 @@ function AccountModal({
               required
             />
             <TestConnectionBtn
+              mcUrl={mcUrl}
               adspower_id={form.adspower_id}
               proxy_host={form.proxy_host}
               proxy_port={form.proxy_port}
@@ -380,6 +385,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | undefined>();
+  const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
 
   const fetchAccounts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -394,6 +400,10 @@ export default function AccountsPage() {
   };
 
   useEffect(() => { fetchAccounts(); }, []);
+
+  useEffect(() => {
+    getMcUrl().then(setMcUrl);
+  }, []);
 
   const deleteAccount = async (id: string) => {
     if (!confirm('Remove this account? This cannot be undone.')) return;
@@ -471,6 +481,7 @@ export default function AccountsPage() {
         {showAdd && (
           <AccountModal
             existing={editAccount}
+            mcUrl={mcUrl}
             onClose={() => { setShowAdd(false); setEditAccount(undefined); }}
             onSaved={fetchAccounts}
           />

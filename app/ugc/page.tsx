@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Clock, CheckCircle, AlertCircle, Play, Square, Zap, Instagram, RefreshCw } from 'lucide-react';
+import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#ec4899';
-const MC = 'http://127.0.0.1:3337';
 
 interface IGAccount {
   id: string;
@@ -54,6 +54,7 @@ export default function UGCPase() {
     error: null,
   });
   const [manualRunning, setManualRunning] = useState(false);
+  const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'ok' | 'error', text: string) => {
@@ -65,8 +66,8 @@ export default function UGCPase() {
   const loadState = useCallback(async () => {
     try {
       const [autoRes, accRes] = await Promise.all([
-        fetch(MC + '/api/instagram/auto-post').then(r => r.json()),
-        fetch(MC + '/api/ugc/accounts').then(r => r.json()),
+        fetch(mcUrl + '/api/instagram/auto-post').then(r => r.json()),
+        fetch(mcUrl + '/api/ugc/accounts').then(r => r.json()),
       ]);
       if (autoRes.enabled !== undefined) {
         setAutoPost(prev => ({
@@ -82,8 +83,8 @@ export default function UGCPase() {
   // Poll run state
   const pollRunState = useCallback(async () => {
     try {
-      const res = await fetch(MC + '/api/tiktok').then(r => r.json());
-      // tiktok-state tracks both — check if there's IG-specific state
+      const res = await fetch(mcUrl + '/api/tiktok').then(r => r.json());
+      // tiktok-state tracks both â€” check if there's IG-specific state
       // The bridge-to-ig.cjs writes to the same state file
       setRunState({
         status: res.status || 'idle',
@@ -99,6 +100,8 @@ export default function UGCPase() {
     } catch { /* ignore */ }
   }, []);
 
+  useEffect(() => { getMcUrl().then(setMcUrl); }, []);
+
   useEffect(() => {
     loadState();
     pollRunState();
@@ -110,7 +113,7 @@ export default function UGCPase() {
     setLoadingAuto(true);
     const newEnabled = !autoPost.enabled;
     try {
-      const res = await fetch(MC + '/api/instagram/auto-post', {
+      const res = await fetch(mcUrl + '/api/instagram/auto-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: newEnabled, hourUtc: autoPost.hourUtc }),
@@ -142,7 +145,7 @@ export default function UGCPase() {
     setManualRunning(true);
     setRunState(prev => ({ ...prev, status: 'generating', error: null, heyGenComplete: false, igComplete: false, totalPosts: 0 }));
     try {
-      const res = await fetch(MC + '/api/instagram/auto', {
+      const res = await fetch(mcUrl + '/api/instagram/auto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario: autoPost.scenario }),
@@ -188,7 +191,7 @@ export default function UGCPase() {
       <div className="page-content">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
           <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>HeyGen + Instagram</div>
-          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Auto-generate UGC videos and post to Instagram — independent from TikTok</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-3)' }}>Auto-generate UGC videos and post to Instagram â€” independent from TikTok</div>
         </motion.div>
 
         {/* Toast */}
@@ -207,7 +210,7 @@ export default function UGCPase() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Auto-Post to Instagram</div>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-3)' }}>HeyGen generates video daily at scheduled hour — auto-posts to all IG accounts</div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-3)' }}>HeyGen generates video daily at scheduled hour â€” auto-posts to all IG accounts</div>
             </div>
             <button
               onClick={handleAutoPostToggle}
@@ -262,8 +265,8 @@ export default function UGCPase() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
           {[
             { icon: <Instagram size={14} />, val: accounts.length.toString(), label: 'IG Accounts', accent: ACCENT },
-            { icon: <Video size={14} />, val: runState.heyGenComplete ? '✓' : (runState.status === 'generating' ? Math.round(runState.heyGenProgress) + '%' : '—'), label: 'Video Generated', accent: '#8b5cf6' },
-            { icon: <CheckCircle size={14} />, val: runState.igComplete ? runState.totalPosts.toString() : '—', label: 'Posted', accent: '#10b981' },
+            { icon: <Video size={14} />, val: runState.heyGenComplete ? 'âœ“' : (runState.status === 'generating' ? Math.round(runState.heyGenProgress) + '%' : 'â€”'), label: 'Video Generated', accent: '#8b5cf6' },
+            { icon: <CheckCircle size={14} />, val: runState.igComplete ? runState.totalPosts.toString() : 'â€”', label: 'Posted', accent: '#10b981' },
             { icon: <Clock size={14} />, val: autoPost.enabled ? `${autoPost.hourUtc}:00 UTC` : 'Off', label: 'Schedule', accent: '#f59e0b' },
           ].map((s, i) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}
@@ -272,7 +275,7 @@ export default function UGCPase() {
                 <div style={{ color: s.accent }}>{s.icon}</div>
                 <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</div>
               </div>
-              <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '-1px', color: s.val === '—' || s.val === 'Off' ? 'var(--text-3)' : 'var(--text)' }}>{s.val}</div>
+              <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '-1px', color: s.val === 'â€”' || s.val === 'Off' ? 'var(--text-3)' : 'var(--text)' }}>{s.val}</div>
             </motion.div>
           ))}
         </div>
@@ -299,7 +302,7 @@ export default function UGCPase() {
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>
-                    {runState.status === 'generating' ? '🎬 Generating video via HeyGen...' : '📤 Posting to Instagram...'}
+                    {runState.status === 'generating' ? 'ðŸŽ¬ Generating video via HeyGen...' : 'ðŸ“¤ Posting to Instagram...'}
                   </div>
                   <div style={{ fontSize: '11.5px', color: 'var(--text-3)' }}>
                     {runState.status === 'generating' ? Math.round(runState.heyGenProgress) + '%' : Math.round(runState.igProgress) + '%'}
@@ -331,7 +334,7 @@ export default function UGCPase() {
             {runState.status === 'idle' && !runState.error && (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>
                 <div style={{ color: 'var(--text-3)', fontSize: '13px', marginBottom: 12 }}>
-                  {autoPost.enabled ? 'Auto-post is active — next run at ' + autoPost.hourUtc + ':00 UTC' : 'Auto-post is off — trigger manually below'}
+                  {autoPost.enabled ? 'Auto-post is active â€” next run at ' + autoPost.hourUtc + ':00 UTC' : 'Auto-post is off â€” trigger manually below'}
                 </div>
               </div>
             )}
@@ -374,7 +377,7 @@ export default function UGCPase() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>@{acc.username}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{acc.days_active || 0} days active · limit {acc.current_daily_limit || '?'}/day</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{acc.days_active || 0} days active Â· limit {acc.current_daily_limit || '?'}/day</div>
                   </div>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: acc.status === 'active' ? '#10b981' : '#f59e0b' }} />
                 </div>
