@@ -12,6 +12,8 @@ interface IGAccount {
   status: string;
   days_active?: number;
   current_daily_limit?: number;
+  warmup_completed?: boolean;
+  warmup_days_completed?: number;
 }
 
 interface UGCRunState {
@@ -187,6 +189,20 @@ export default function UGCPase() {
           </div>
         </div>
       </div>
+
+      {/* Warmup warning if no accounts are warmed up */}
+      {(() => {
+      const warmedCount = accounts.filter(a => a.warmup_completed || (a.warmup_days_completed || 0) >= 7).length;
+      if (warmedCount > 0) return null;
+      return (
+        <div style={{ margin: '12px 24px', padding: '10px 16px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <AlertCircle size={14} style={{ color: '#f59e0b', marginTop: 2, flexShrink: 0 }} />
+          <div style={{ fontSize: 12, color: '#92400e' }}>
+            <strong>No accounts warmed up.</strong> Complete warmup (7 days) before running campaigns — accounts are blocked until then.
+          </div>
+        </div>
+      );
+      })()}
 
       <div className="page-content">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
@@ -376,7 +392,13 @@ export default function UGCPase() {
                     <Instagram size={14} style={{ color: ACCENT }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>@{acc.username}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>@{acc.username}
+                      {acc.warmup_completed || (acc.warmup_days_completed || 0) >= 7 ? (
+                        <span style={{ marginLeft: 6, fontSize: 10, background: '#dcfce7', color: '#16a34a', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>WARMED</span>
+                      ) : (
+                        <span style={{ marginLeft: 6, fontSize: 10, background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>DAY {acc.warmup_days_completed || 0}/7</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{acc.days_active || 0} days active Â· limit {acc.current_daily_limit || '?'}/day</div>
                   </div>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: acc.status === 'active' ? '#10b981' : '#f59e0b' }} />
