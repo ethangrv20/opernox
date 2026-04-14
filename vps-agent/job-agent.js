@@ -707,16 +707,60 @@ async function poll() {
 }
 
 // ============================================
-// PING KEEPALIVE — update last_ping in vps_agents
+// PING KEEPALIVE — update last_ping in vpses
 // ============================================
 async function pingVps() {
+  if (!CONFIG.USER_ID) return;
   try {
-    await supabaseRequest('PATCH', `vps_agents?id=eq.${CONFIG.VPS_ID}`, {
-      last_ping: new Date().toISOString(),
-      status: 'online'
+    await supabaseRequest('PATCH', `vpses?user_id=eq.${CONFIG.USER_ID}&status=eq.active`, {
+      last_ping: new Date().toISOString()
     });
   } catch(e) {
     // Table might not exist yet, ignore
+  }
+}
+
+// ============================================
+// AUTO-REGISTER VPS on first boot
+// ============================================
+async function registerVps() {
+  if (!CONFIG.USER_ID) {
+    log('warn', 'USER_ID not set — skipping VPS registration');
+    return;
+  }
+
+  const hostname = process.env.COMPUTERNAME || CONFIG.VPS_ID;
+  let publicIp = 'unknown';
+  try {
+    const ipRes = await fetch('https://api.ipify.org', { timeout: 5000 });
+    publicIp = await ipRes.text();
+  } catch(e) {
+    log('warn', 'Could not fetch public IP for registration', { error: e.message });
+  }
+
+  const payload = {
+    user_id: CONFIG.USER_ID,
+    hostname,
+    ip: publicIp,
+    status: 'bootstrapping',
+    platform: 'kvm',
+    os: 'windowsr2',
+    slices: 8,
+    location: 1,
+    location_name: 'Secaucus NJ',
+    bootstrapped_at: new Date().toISOString(),
+  };
+
+  try {
+    const result = await supabaseRequest('POST', 'vpses', payload);
+    // result is an array with the inserted record (Prefer: return=representation)
+    const vpsRecord = Array.isArray(result) ? result[0] : result;
+    if (vpsRecord?.id) {
+      CONFIG.VPS_ID = vpsRecord.id; // Use Supabase UUID as the VPS ID going forward
+      log('info', 'VPS registered', { vpsId: CONFIG.VPS_ID, userId: CONFIG.USER_ID, ip: publicIp });
+    }
+  } catch(e) {
+    log('error', 'VPS registration failed', { error: e.message });
   }
 }
 
@@ -732,6 +776,9 @@ function startup() {
     pollIntervalMs: CONFIG.POLL_INTERVAL_MS
   });
   
+  // Auto-register VPS on first boot
+  registerVps();
+
   // Immediate first poll
   setTimeout(poll, 2000);
   
