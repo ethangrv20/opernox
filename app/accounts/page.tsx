@@ -69,17 +69,9 @@ type TestStatus = 'idle' | 'testing' | 'ok' | 'fail';
 function TestConnectionBtn({
   mcUrl,
   adspower_id,
-  proxy_host,
-  proxy_port,
-  proxy_user,
-  proxy_pass,
 }: {
   mcUrl: string;
   adspower_id: string;
-  proxy_host: string;
-  proxy_port: string | number;
-  proxy_user: string;
-  proxy_pass: string;
 }) {
   const [status, setStatus] = useState<TestStatus>('idle');
   const [msg, setMsg] = useState('');
@@ -92,13 +84,7 @@ function TestConnectionBtn({
       const res = await fetch(mcUrl + '/api/adspower/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile_id: adspower_id.trim(),
-          proxy_host: proxy_host.trim() || undefined,
-          proxy_port: proxy_port ? parseInt(String(proxy_port)) : undefined,
-          proxy_user: proxy_user.trim() || undefined,
-          proxy_pass: proxy_pass || undefined,
-        }),
+        body: JSON.stringify({ profile_id: adspower_id.trim() }),
       });
       const d = await res.json();
       if (d.success) { setStatus('ok'); setMsg(d.message || 'Connected!'); }
@@ -149,9 +135,9 @@ function AccountModal({
     name: existing?.name ?? '',
     adspower_id: existing?.adspower_id ?? '',
     account_system: existing?.account_system ?? ('ig_ugc' as AccountSystem),
-    proxy_host: existing?.proxy_host ?? '',
-    proxy_port: String(existing?.proxy_port ?? ''),
-    proxy_user: existing?.proxy_user ?? '',
+    proxy_host: '',
+    proxy_port: '',
+    proxy_user: '',
     proxy_pass: '',
   });
   const [loading, setLoading] = useState(false);
@@ -170,22 +156,14 @@ function AccountModal({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const payload: any = {
+      const payload = {
         user_id: user.id,
         name: form.name,
         adspower_id: form.adspower_id,
         platform: SYSTEM_TO_PLATFORM[form.account_system],
         account_system: form.account_system,
-        proxy_host: form.proxy_host || null,
-        proxy_port: form.proxy_port ? parseInt(String(form.proxy_port)) : null,
-        proxy_user: form.proxy_user || null,
         status: 'active',
       };
-      if (!existing) {
-        payload.warmup_start_date = new Date().toISOString();
-        payload.daily_limit = 5;
-      }
-      if (form.proxy_pass) payload.proxy_pass = form.proxy_pass;
 
       const { error: err } = existing
         ? await supabase.from('accounts').update(payload).eq('id', existing.id)
@@ -266,29 +244,7 @@ function AccountModal({
               onChange={e => setForm(f => ({ ...f, adspower_id: e.target.value }))}
               required
             />
-            <TestConnectionBtn
-              mcUrl={mcUrl}
-              adspower_id={form.adspower_id}
-              proxy_host={form.proxy_host}
-              proxy_port={form.proxy_port}
-              proxy_user={form.proxy_user}
-              proxy_pass={form.proxy_pass}
-            />
-          </div>
-
-          {/* Proxy */}
-          <div className="field">
-            <label className="field-label">Proxy <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(optional but recommended)</span></label>
-            <div className="field-row-2">
-              <input className="field-input" placeholder="Host — e.g. 207.135.197.155" value={form.proxy_host}
-                onChange={e => setForm(f => ({ ...f, proxy_host: e.target.value }))} />
-              <input className="field-input" placeholder="Port — e.g. 6096" value={form.proxy_port}
-                onChange={e => setForm(f => ({ ...f, proxy_port: e.target.value }))} />
-            </div>
-            <input className="field-input" style={{ marginTop: 8 }} placeholder="Username (if auth required)" value={form.proxy_user}
-              onChange={e => setForm(f => ({ ...f, proxy_user: e.target.value }))} />
-            <input className="field-input" style={{ marginTop: 8 }} type="password" placeholder="Password (if auth required)" value={form.proxy_pass}
-              onChange={e => setForm(f => ({ ...f, proxy_pass: e.target.value }))} />
+            <TestConnectionBtn mcUrl={mcUrl} adspower_id={form.adspower_id} />
           </div>
 
           <div className="acc-modal__foot">
@@ -339,13 +295,6 @@ function AccountCard({ account, onEdit, onDelete }: {
         <span className="acc-tag" style={{ color: sinfo.color, background: sinfo.color + '14', borderColor: sinfo.color + '30' }}>
           {sinfo.icon} {sinfo.label}
         </span>
-        {account.proxy_host ? (
-          <span className="acc-tag acc-tag--proxy">
-            <Globe size={10} /> {account.proxy_host}:{account.proxy_port}
-          </span>
-        ) : (
-          <span className="acc-tag acc-tag--nopxy">No proxy</span>
-        )}
       </div>
 
       {/* Stats */}
