@@ -137,6 +137,21 @@ if ($gitAvailable) {
 }
 Write-Log "Repo cloned to $MissionControlDir"
 
+# ── Step 6b: Clone ops repo (ig-automation + mission-control server) ─────────
+$OpsRepoUrl = "https://github.com/ethangrv20/textascend-ops.git"
+$OpsDir = "C:\opernox-agent\ops"
+Write-Log "Cloning ops repo: $OpsRepoUrl..."
+if (-not (Test-Path $OpsDir)) {
+  git clone --branch master --depth 1 $OpsRepoUrl $OpsDir 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    # Retry with basic git auth header if private
+    git clone --branch master --depth 1 $OpsRepoUrl $OpsDir
+  }
+  Write-Log "Ops repo cloned to $OpsDir"
+} else {
+  Write-Log "Ops repo already exists at $OpsDir — skipping clone"
+}
+
 # ── Step 7: Install npm dependencies ────────────────────────────────────────
 Write-Log "Installing npm dependencies..."
 Set-Location $MissionControlDir
@@ -146,6 +161,14 @@ npm install --silent 2>$null
 if (Test-Path "C:\opernox-agent\mission-control\package.json") {
   Set-Location "C:\opernox-agent\mission-control"
   npm install --silent 2>$null
+}
+
+# Install ig-automation dependencies (warmup + posting scripts)
+if (Test-Path "C:\opernox-agent\ops\ig-automation\package.json") {
+  Write-Log "Installing ig-automation npm dependencies..."
+  Set-Location "C:\opernox-agent\ops\ig-automation"
+  npm install --silent 2>$null
+  Set-Location "C:\opernox-agent\mission-control"
 }
 
 # ── Step 8: Create ecosystem.config.js ──────────────────────────────────────
@@ -183,6 +206,20 @@ module.exports = {
     },
     error_file: 'C:\\opernox-agent\\logs\\server-err.log',
     out_file: 'C:\\opernox-agent\\logs\\server-out.log',
+  }, {
+    name: 'warmup-scheduler',
+    script: './ig-automation/warmup-scheduler.cjs',
+    cwd: 'C:\\opernox-agent\\ops',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '512M',
+    env: {
+      NODE_ENV: 'production',
+    },
+    error_file: 'C:\\opernox-agent\\logs\\scheduler-err.log',
+    out_file: 'C:\\opernox-agent\\logs\\scheduler-out.log',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss',
   }],
 };
 "@
