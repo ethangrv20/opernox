@@ -22,6 +22,8 @@ interface Account {
   proxy_pass: string | null;
   status: 'active' | 'paused' | 'error';
   warmup_start_date: string | null;
+  warmup_days_completed: number;
+  warmup_completed: boolean;
   daily_limit: number;
   created_at: string;
 }
@@ -115,6 +117,60 @@ function TestConnectionBtn({
       {msg && (
         <span className={`test-conn__msg test-conn__msg--${status}`}>{msg}</span>
       )}
+    </div>
+  );
+}
+
+// ─── Run Warmup Button ────────────────────────────────────────────────────────
+type WarmupStatus = 'idle' | 'running' | 'done' | 'error';
+
+function RunWarmupBtn({ account, mcUrl }: { account: Account; mcUrl: string }) {
+  const [status, setStatus] = useState<WarmupStatus>('idle');
+  const [msg, setMsg] = useState('');
+
+  const runWarmup = async () => {
+    if (!confirm(`Start warmup for "${account.name}"?\n\n15-minute Explore session — likes ~30 posts.\nInstagram may temporarily flag if done too fast.`)) return;
+    setStatus('running');
+    setMsg('');
+    try {
+      const res = await fetch(mcUrl + '/api/ig/warmup/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: account.adspower_id, duration_min: 15 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus('done');
+        setMsg('Warmup started — run complete to advance the day');
+      } else {
+        setStatus('error');
+        setMsg(data.error || 'Failed to start warmup');
+      }
+    } catch (e: any) {
+      setStatus('error');
+      setMsg(e?.message || 'Connection failed');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+      <button
+        className="btn btn-sm"
+        style={{ background: '#a78bfa', color: '#fff', border: 'none', fontSize: 11, padding: '4px 10px' }}
+        onClick={runWarmup}
+        disabled={status === 'running'}
+      >
+        {status === 'running' ? (
+          <><Loader2 size={10} className="spin" /> Running 15min...</>
+        ) : status === 'done' ? (
+          <><CheckCircle size={10} /> Started — mark day done</>
+        ) : status === 'error' ? (
+          <><AlertCircle size={10} /> Retry warmup</>
+        ) : (
+          <>▶ Run Warmup</>
+        )}
+      </button>
+      {msg && <span style={{ fontSize: 10, color: status === 'error' ? '#ef4444' : 'var(--text-3)' }}>{msg}</span>}
     </div>
   );
 }
@@ -260,14 +316,17 @@ function AccountModal({
 }
 
 // ─── Account Card ─────────────────────────────────────────────────────────────
-function AccountCard({ account, onEdit, onDelete }: {
+function AccountCard({ account, onEdit, onDelete, mcUrl }: {
   account: Account;
   onEdit: () => void;
   onDelete: () => void;
+  mcUrl: string;
 }) {
   const sinfo = systemInfo(account.account_system as AccountSystem);
-  const days = getDaysActive(account.warmup_start_date);
+  const days = account.warmup_days_completed ?? getDaysActive(account.warmup_start_date);
   const isIg = account.account_system === 'ig_ugc' || account.account_system === 'ig_outreach';
+  const warmupDone = account.warmup_completed || days >= 7;
+  const warmupStarted = !!account.warmup_start_date;
 
   return (
     <motion.div
@@ -297,18 +356,36 @@ function AccountCard({ account, onEdit, onDelete }: {
         </span>
       </div>
 
-      {/* Stats */}
+      {/* Warmup Status — IG UGC only */}
       {isIg && (
-        <div className="acc-card__stats">
-          <div className="acc-stat">
-            <div className="acc-stat__num" style={{ color: sinfo.color }}>Day {Math.min(days + 1, 40)}</div>
-            <div className="acc-stat__label">Warmup</div>
-          </div>
-          <div className="acc-stat__sep" />
-          <div className="acc-stat">
-            <div className="acc-stat__num" style={{ color: '#a78bfa' }}>{account.daily_limit}/day</div>
-            <div className="acc-stat__label">Limit</div>
-          </div>
+        <div style={{ marginTop: 8 }}>
+          {warmupDone ? (
+            <div style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
+              ✓ Warmup complete — {days}/7 days
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, marginBottom: 6 }}>
+                <span style={{ color: 'var(--text-2)' }}>Warmup</span>
+                <span style={{ color: '#a78bfa', fontWeight: 700 }}>Day {days} of 7</span>
+              </div>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: 20,
+                      height: 6,
+                      borderRadius: 3,
+                      background: i < days ? '#a78bfa' : 'var(--border)',
+                      transition: 'background 0.2s',
+                    }}
+                  />
+                ))}
+              </div>
+              <RunWarmupBtn account={account} mcUrl={mcUrl} />
+            </>
+          )}
         </div>
       )}
 
@@ -419,6 +496,7 @@ export default function AccountsPage() {
                   account={a}
                   onEdit={() => { setEditAccount(a); setShowAdd(true); }}
                   onDelete={() => deleteAccount(a.id)}
+                  mcUrl={mcUrl}
                 />
               </div>
             ))}
