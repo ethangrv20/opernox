@@ -1,18 +1,37 @@
 /**
  * lib/mc-url.ts
  * Returns the current user's Mission Control URL dynamically.
- * Fetches VPS IP from /api/client-vps (runtime, per-user).
- * Caches result for the session to avoid redundant API calls.
+ * Fetches the VPS tunnel_url from /api/client-vps (per-user, per-VPS).
  */
 
-let cachedMcUrl: string | null = null;
+let cachedMcUrl: string = '';
 
 export async function getMcUrl(): Promise<string> {
-  // Skip cache on every call to avoid stale values persisting across page loads
-  // Return tunnel URL directly — bypass all DB lookups which fail in production
-  return process.env.NEXT_PUBLIC_MC_URL || 'https://exhibition-speaks-lucia-yet.trycloudflare.com';
+  // Return cached value if available
+  if (cachedMcUrl) return cachedMcUrl;
+
+  try {
+    // Fetch the current user's VPS info
+    const res = await fetch('/api/client-vps', {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      const vps = await res.json();
+      if (vps && vps.tunnel_url) {
+        cachedMcUrl = vps.tunnel_url;
+        return cachedMcUrl;
+      }
+    }
+  } catch {
+    // Fall through to fallback
+  }
+
+  cachedMcUrl = process.env.NEXT_PUBLIC_MC_URL || 'http://localhost:3337';
+  return cachedMcUrl;
 }
 
 export function clearMcUrlCache() {
-  cachedMcUrl = null;
+  cachedMcUrl = '';
 }
