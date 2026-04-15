@@ -71,29 +71,25 @@ export default function UGCPase() {
   // Load auto-post state + IG accounts
   const loadState = useCallback(async () => {
     const url = mcUrl;
-    console.log('[UGC] loadState called, mcUrl:', url);
     try {
       const [autoRes, accRes] = await Promise.all([
         fetch(url + '/api/instagram/auto-post', { cache: 'no-store' }).catch(() => null),
         fetch(url + '/api/ugc/accounts', { cache: 'no-store' }).catch(() => null),
       ]);
-      console.log('[UGC] auto-post response:', autoRes?.status, autoRes?.ok);
-      console.log('[UGC] ugc/accounts response:', accRes?.status, accRes?.ok);
       const autoJson = autoRes ? await autoRes.json().catch(() => null) : null;
       const accJson = accRes ? await accRes.json().catch(() => null) : null;
-      console.log('[UGC] ugc/accounts data:', JSON.stringify(accJson));
-      if (autoJson && typeof autoJson === 'object' && 'enabled' in autoJson) {
-        setAutoPost(prev => ({
-          ...prev,
-          enabled: (autoJson as any).enabled,
-          hourUtc: (autoJson as any).hourUtc || 14,
-        }));
+      if (accJson && Array.isArray(accJson.accounts) && accJson.accounts.length > 0) {
+        setAccounts(accJson.accounts);
+        return;
       }
-      if (accJson && typeof accJson === 'object' && 'accounts' in accJson) {
-        console.log('[UGC] setting accounts:', (accJson as any).accounts);
-        setAccounts((accJson as any).accounts || []);
-      } else {
-        console.log('[UGC] accJson was:', accJson);
+      // Fallback: fetch from Supabase directly
+      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqZGVnbWhzdnd5bXh6ZXp3d25hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjAxMTgzMSwiZXhwIjoyMDkxNTg3ODMxfQ.67ojMu3XLJ_IR354Kaw9Jk1r_CH6yf3zR-YDt6ZdUv4';
+      const supabaseRes = await fetch(`https://ujdegmhsvwymxzezwwna.supabase.co/rest/v1/accounts?account_system=eq.ig_ugc&select=id,name,adspower_id,warmup_days_completed,warmup_completed,status&order=created_at.desc`, {
+        headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey },
+      });
+      if (supabaseRes.ok) {
+        const supabaseData = await supabaseRes.json();
+        setAccounts(supabaseData.map((a: any) => ({ ...a, username: a.name })));
       }
     } catch (e) {
       console.error('[UGC] loadState error:', e);
@@ -134,7 +130,6 @@ export default function UGCPase() {
 
   useEffect(() => {
     getMcUrl().then(url => {
-      console.log('[UGC] getMcUrl resolved to:', url);
       setMcUrl(url);
       fetch(url + '/api/campaigns/schedule')
         .then(r => r.ok ? r.json() : null)
@@ -152,13 +147,14 @@ export default function UGCPase() {
         })
         .catch(() => {});
       fetchWarmupSchedule(url);
+      loadState();
     });
   }, []);
 
   useEffect(() => {
     if (!mcUrl) return;
     loadState();
-  }, [mcUrl, loadState]);
+  }, [mcUrl]);
 
   useEffect(() => {
     pollRunState();
