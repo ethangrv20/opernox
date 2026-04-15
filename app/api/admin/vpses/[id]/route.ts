@@ -1,11 +1,12 @@
 /**
- * DELETE /api/admin/vpses/[id]
- * Mark a VPS as terminated
+ * GET /api/admin/vpses/[id]
+ * Get VPS status including bootstrap log tail
  */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export async function DELETE(
+export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -17,11 +18,31 @@ export async function DELETE(
     { auth: { persistSession: false } }
   );
 
-  const { error } = await supabase
+  const { data: vps, error } = await supabase
     .from('vpses')
-    .update({ status: 'terminated', terminated_at: new Date().toISOString() })
-    .eq('id', id);
+    .select('*')
+    .eq('id', id)
+    .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  if (error || !vps) {
+    return NextResponse.json({ error: 'VPS not found' }, { status: 404 });
+  }
+
+  // Read bootstrap log if it exists
+  let bootstrapLog = null;
+  try {
+    const fs = await import('fs');
+    const logPath = `C:\\temp\\bootstrap-log-${id}.txt`;
+    if (fs.existsSync(logPath)) {
+      const content = fs.readFileSync(logPath, 'utf8');
+      // Return last 50 lines
+      const lines = content.split('\n').filter(Boolean).slice(-50);
+      bootstrapLog = lines.join('\n');
+    }
+  } catch { /* log not accessible */ }
+
+  return NextResponse.json({
+    ...vps,
+    bootstrapLog,
+  });
 }
