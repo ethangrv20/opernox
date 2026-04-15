@@ -134,7 +134,10 @@ function spawnBootstrap(
   hostname: string,
   supabaseUrl: string,
   serviceRoleKey: string,
-  bootstrapScriptPath: string
+  bootstrapScriptPath: string,
+  cfAccountId: string,
+  cfZoneId: string,
+  cfApiToken: string
 ) {
   // Write the WinRM runner script to C:\temp
   // This script waits for VPS to be reachable then runs bootstrap.ps1 via WinRM
@@ -147,6 +150,9 @@ function spawnBootstrap(
     '$hostname = "' + hostname + '"',
     '$SupabaseUrl = "' + supabaseUrl + '"',
     '$ServiceRoleKey = "' + serviceRoleKey + '"',
+    '$CFAccountId = "' + cfAccountId + '"',
+    '$CFZoneId = "' + cfZoneId + '"',
+    '$CFApiToken = "' + cfApiToken + '"',
     '$BootstrapScript = "' + bootstrapScriptPath.replace(/\\/g, '\\\\') + '"',
     '$LOG = "C:\\temp\\bootstrap-log-' + vpsRecordId + '.txt"',
     '',
@@ -194,7 +200,7 @@ function spawnBootstrap(
     '    -SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck) ',
     '    -ScriptBlock {',
     '      Set-ExecutionPolicy Bypass -Scope Process -Force',
-    '      & "C:\\temp\\bootstrap-run.ps1" -SupabaseUrl $using:SupabaseUrl -ServiceRoleKey $using:ServiceRoleKey -UserId $using:userId -VpsHostname $using:hostname',
+    '      & "C:\\temp\\bootstrap-run.ps1" -SupabaseUrl $using:SupabaseUrl -ServiceRoleKey $using:ServiceRoleKey -UserId $using:userId -VpsHostname $using:hostname -VpsRecordId $using:vpsRecordId -CFAccountId $using:CFAccountId -CFZoneId $using:CFZoneId -CFApiToken $using:CFApiToken',
     '  } 2>&1 | ForEach-Object { Write-Log "[VPS] $_" }',
     '  Write-Log "Bootstrap completed."',
     '} catch {',
@@ -344,7 +350,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    spawnBootstrap(hostname, rootpass, user_id, vpsRecord.id, hostname, supabaseUrl, serviceRoleKey, bootstrapScriptDest);
+    const CF_API_TOKEN = process.env.CF_API_TOKEN || '';
+    const CF_ACCOUNT_ID = '26476d8594c544120bdc9cc80511c670';
+    const CF_ZONE_ID = 'a9a96b06e25dc3e511df4682acc45590';
+    spawnBootstrap(hostname, rootpass, user_id, vpsRecord.id, hostname, supabaseUrl, serviceRoleKey, bootstrapScriptDest, CF_ACCOUNT_ID, CF_ZONE_ID, CF_API_TOKEN);
   } catch (err: any) {
     console.error('[Provision] Failed to spawn bootstrapper:', err);
     return NextResponse.json({

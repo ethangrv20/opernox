@@ -41,7 +41,20 @@ param(
   [string]$OpsRepoUrl = "https://github.com/ethangrv20/textascend-ops.git",
 
   [Parameter(Mandatory=$false)]
-  [string]$VpsHostname = ""
+  [string]$VpsHostname = "",
+
+  [Parameter(Mandatory=$false)]
+  [string]$VpsRecordId = "",
+
+  [Parameter(Mandatory=$false)]
+  [string]$CFAccountId = "26476d8594c544120bdc9cc80511c670",
+
+  [Parameter(Mandatory=$false)]
+  [string]$CFZoneId = "a9a96b06e25dc3e511df4682acc45590",
+
+  [Parameter(Mandatory=$false)]
+  [string]$CFApiToken = ""
+
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,9 +73,20 @@ function Write-Log {
   Write-Host "[$ts][$Level] $Msg"
 }
 
+if (-not $CFApiToken) {
+  Write-Log "ERROR: CFApiToken parameter not provided." -Level "ERROR"
+  exit 1
+}
+
+if (-not $VpsRecordId) {
+  Write-Log "ERROR: VpsRecordId parameter not provided." -Level "ERROR"
+  exit 1
+}
+
 Write-Log "=== VPS Bootstrap Started ==="
 Write-Log "UserId: $UserId"
 Write-Log "SupabaseUrl: $SupabaseUrl"
+Write-Log "VpsRecordId: $VpsRecordId"
 
 # ── Step 1: Disable Firewall ─────────────────────────────────────────────────
 Write-Log "Disabling Windows Firewall..."
@@ -199,8 +223,24 @@ pm2 save 2>`$null
 $pm2Startup = pm2 startup 2>`$null
 Write-Log "PM2 started."
 
-# ── Step 10: Set up cloudflared tunnel ────────────────────────────────────────
-Write-Log "Setting up cloudflared tunnel..."
+# ── Step 10: Set up per-client Cloudflare named tunnel ────────────────────────
+Write-Log "Setting up Cloudflare named tunnel..."
+
+# Cloudflare credentials from parameters (passed from provision/route.ts)
+$CF_ACCOUNT_ID = $CFAccountId
+$CF_ZONE_ID = $CFZoneId
+$CF_API_TOKEN = $CFApiToken
+$CF_API_BASE = "https://api.cloudflare.com/client/v4"
+
+if (-not $CF_ACCOUNT_ID -or -not $CF_ZONE_ID -or -not $CF_API_TOKEN) {
+  Write-Log "ERROR: Cloudflare credentials not provided (CFAccountId, CFZoneId, CFApiToken)." -Level "ERROR"
+  exit 1
+}
+
+if (-not $VpsRecordId) {
+  Write-Log "ERROR: VpsRecordId not provided." -Level "ERROR"
+  exit 1
+}
 
 # Download cloudflared if not present
 if (-not (Test-Path $CLOUDFLARED)) {
@@ -212,33 +252,106 @@ if (-not (Test-Path $CLOUDFLARED)) {
   Write-Log "cloudflared already present."
 }
 
-# Kill any existing cloudflared tunnel processes
+# Kill any existing cloudflared processes
 Get-Process -Name "cloudflared" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep 1
 
-# Remove old log
-if (Test-Path $TUNNEL_LOG) { Remove-Item $TUNNEL_LOG -Force }
+# Generate stable per-VPS tunnel name and subdomain
+$TUNNEL_NAME = "client-vps-$($VpsRecordId -replace '-', '')"
+$SUBDOMAIN = "mc-$($VpsRecordId -replace '-', '')"
+$DOMAIN_NAME = "$SUBDOMAIN.opernox.com"
 
-# Start tunnel — redirect stdout to log file so we can capture the URL
-# Use cmd /c to redirect stdout+stderr to the log file
-$nullCmd = [System.Diagnostics.ProcessStartInfo]::new()
-$nullCmd.FileName = "cmd.exe"
-$nullCmd.Arguments = "/c `"$CLOUDFLARED tunnel --url http://127.0.0.1:3337 > `"'$TUNNEL_LOG`'" 2>&1`""
-$nullCmd.UseShellExecute = $false
-$nullCmd.CreateNoWindow = $true
-$nullProcess = [System.Diagnostics.Process]::Start($nullCmd)
-Write-Log "cloudflared tunnel started (PID: $($nullProcess.Id))."
+Write-Log "Creating Cloudflare tunnel: $TUNNEL_NAME"
 
-# Wait up to 30s for the tunnel URL to appear in the log
-Start-Sleep 3
-$tunnelUrl = $null
+# 1. Create tunnel via Cloudflare API
+$createBody = @{ name = $TUNNEL_NAME } | ConvertTo-Json
+$createHeaders = @{
+  "Authorization" = "Bearer $CF_API_TOKEN"
+  "Content-Type" = "application/json"
+}
+
+try {
+  $createResp = Invoke-RestMethod -Uri "$CF_API_BASE/accounts/$CF_ACCOUNT_ID/tunnels" `
+    -Method POST -Headers $createHeaders -Body $createBody -TimeoutSec 20
+  if ($createResp.success) {
+    $tunnelId = $createResp.result.id
+    $tunnelToken = $createResp.result.token
+    $tunnelSecret = $createResp.result.credentials_file.TunnelSecret
+    Write-Log "Tunnel created: $tunnelId"
+  } else {
+    throw "Cloudflare tunnel creation failed: $($createResp.errors)"
+  }
+} catch {
+  Write-Log "ERROR: Could not create Cloudflare tunnel: $_" -Level "ERROR"
+  exit 1
+}
+
+# 2. Save credentials file locally for the tunnel service
+$CRED_DIR = "C:\Users\Administrator\.cloudflared"
+if (-not (Test-Path $CRED_DIR)) { New-Item -ItemType Directory -Force -Path $CRED_DIR | Out-Null }
+$CRED_FILE = Join-Path $CRED_DIR "credentials-$TUNNEL_NAME.json"
+$credContent = @{
+  AccountTag = $CF_ACCOUNT_ID
+  TunnelID = $tunnelId
+  TunnelName = $TUNNEL_NAME
+  TunnelSecret = $tunnelSecret
+} | ConvertTo-Json
+Set-Content -Path $CRED_FILE -Value $credContent -Encoding UTF8
+Write-Log "Credentials saved to $CRED_FILE"
+
+# 3. Create DNS CNAME record: mc-{vpsId}.opernox.com → {tunnelId}.cfargotunnel.com
+$dnsBody = @{
+  type = "CNAME"
+  name = $SUBDOMAIN
+  content = "$tunnelId.cfargotunnel.com"
+  proxied = $true
+} | ConvertTo-Json
+
+$dnsHeaders = @{
+  "Authorization" = "Bearer $CF_API_TOKEN"
+  "Content-Type" = "application/json"
+}
+
+try {
+  $dnsGetResp = Invoke-RestMethod -Uri "$CF_API_BASE/zones/$CF_ZONE_ID/dns_records?name=$DOMAIN_NAME" `
+    -Method GET -Headers $dnsHeaders -TimeoutSec 15
+  $existingRecord = $dnsGetResp.result | Where-Object { $_.name -eq $DOMAIN_NAME }
+
+  if ($existingRecord) {
+    $updateDnsResp = Invoke-RestMethod -Uri "$CF_API_BASE/zones/$CF_ZONE_ID/dns_records/$($existingRecord.id)" `
+      -Method PUT -Headers $dnsHeaders -Body $dnsBody -TimeoutSec 15
+    Write-Log "DNS record updated: $DOMAIN_NAME -> $tunnelId.cfargotunnel.com"
+  } else {
+    $createDnsResp = Invoke-RestMethod -Uri "$CF_API_BASE/zones/$CF_ZONE_ID/dns_records" `
+      -Method POST -Headers $dnsHeaders -Body $dnsBody -TimeoutSec 15
+    Write-Log "DNS record created: $DOMAIN_NAME -> $tunnelId.cfargotunnel.com"
+  }
+} catch {
+  Write-Log "WARNING: Could not set DNS record: $_" -Level "WARN"
+}
+
+# 4. Run cloudflared with --token (no cert.pem needed when using tunnel token by UUID)
+Write-Log "Starting cloudflared tunnel..."
+$logFile = "C:\temp\cloudflared-$TUNNEL_NAME.log"
+
+$runCmd = [System.Diagnostics.ProcessStartInfo]::new()
+$runCmd.FileName = "cmd.exe"
+$runCmd.Arguments = "/c `"$CLOUDFLARED tunnel --token $tunnelToken run >> `"'$logFile`'" 2>&1`""
+$runCmd.UseShellExecute = $false
+$runCmd.CreateNoWindow = $true
+$runProcess = [System.Diagnostics.Process]::Start($runCmd)
+Write-Log "cloudflared started (PID: $($runProcess.Id)). Log: $logFile"
+
+# 5. Wait for tunnel to connect to Cloudflare edge
+Start-Sleep 5
 $maxWait = 30
-$elapsed = 3
+$elapsed = 5
+$connected = $false
 while ($elapsed -lt $maxWait) {
-  if (Test-Path $TUNNEL_LOG) {
-    $logContent = Get-Content $TUNNEL_LOG -Raw -ErrorAction SilentlyContinue
-    if ($logContent -match 'https://[a-z0-9-]+\.trycloudflare\.com') {
-      $tunnelUrl = $Matches[0]
+  if (Test-Path $logFile) {
+    $logContent = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+    if ($logContent -match 'Registered tunnel connection') {
+      $connected = $true
       break
     }
   }
@@ -246,20 +359,22 @@ while ($elapsed -lt $maxWait) {
   $elapsed += 2
 }
 
-if ($tunnelUrl) {
-  Write-Log "Tunnel URL: $tunnelUrl"
-
-  # Register cloudflared as a Windows service so it auto-starts on reboot
-  $scStop = Start-Process -FilePath "cmd.exe" -ArgumentList "/c sc delete cloudflared 2>`$nul" -Wait -NoNewWindow -PassThru
-  Start-Sleep 1
-  $scCreate = Start-Process -FilePath "cmd.exe" -ArgumentList "/c sc create cloudflared binPath= `"$CLOUDFLARED tunnel --url http://127.0.0.1:3337`" start= auto DisplayName= `"Cloudflared Tunnel`" " -Wait -NoNewWindow -PassThru
-  Start-Sleep 1
-  Start-Process -FilePath "cmd.exe" -ArgumentList "/c sc start cloudflared" -NoNewWindow -PassThru | Out-Null
-  Write-Log "cloudflared Windows service registered."
+if ($connected) {
+  Write-Log "Tunnel connected to Cloudflare edge."
+  $tunnelUrl = "https://$DOMAIN_NAME"
 } else {
-  Write-Log "WARNING: Could not capture tunnel URL from log. Tunnel may still be running." -Level "WARN"
-  $tunnelUrl = "unknown"
+  Write-Log "WARNING: Tunnel may not have connected yet. Check $logFile" -Level "WARN"
+  $tunnelUrl = "https://$DOMAIN_NAME"
 }
+
+# 6. Register cloudflared as a Windows service (survives reboot)
+Write-Log "Registering cloudflared as Windows service..."
+$scDelete = Start-Process -FilePath "cmd.exe" -ArgumentList "/c sc delete cloudflared 2>`$nul" -Wait -NoNewWindow -PassThru
+Start-Sleep 1
+$scCreate = Start-Process -FilePath "cmd.exe" -ArgumentList "/c sc create cloudflared binPath= `"$CLOUDFLARED tunnel --token $tunnelToken run`" start= auto DisplayName= `"Cloudflared Tunnel`" " -Wait -NoNewWindow -PassThru
+Start-Sleep 1
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c sc start cloudflared" -NoNewWindow -PassThru | Out-Null
+Write-Log "cloudflared Windows service registered."
 
 # ── Step 11: Register VPS in Supabase and update tunnel_url ───────────────────
 Write-Log "Registering VPS in Supabase..."
@@ -290,10 +405,11 @@ $vpsBody = @{
   location_name = "Secaucus NJ"
   provisioned_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss.000Z")
   updated_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss.000Z")
+  tunnel_url = $tunnelUrl
 } | ConvertTo-Json
 
 $patchOptions = @{
-  Uri = "${SupabaseUrl}/rest/v1/vpses?hostname=eq.${VpsHostname}"
+  Uri = "${SupabaseUrl}/rest/v1/vpses?id=eq.${VpsRecordId}"
   Method = "PATCH"
   Headers = $headers
   ContentType = "application/json"
