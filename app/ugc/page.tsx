@@ -1,7 +1,7 @@
 ﻿'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Clock, CheckCircle, AlertCircle, Play, Square, Zap, Instagram, RefreshCw, Shield, ShieldCheck } from 'lucide-react';
+import { Video, Clock, CheckCircle, AlertCircle, Play, Square, Zap, Instagram, RefreshCw, Shield, ShieldCheck, Loader2 } from 'lucide-react';
 import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#ec4899';
@@ -340,8 +340,13 @@ export default function UGCPase() {
                         ) : (
                           <div style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa' }}>Day {days}/7</div>
                         )}
-                        {/* Toggle */}
-                        <WarmupToggle profileId={acc.adspower_id || acc.id} enabled={!!(warmupSched || {})[acc.adspower_id || acc.id]?.enabled} mcUrl={mcUrl} done={done} onToggle={() => fetchWarmupSchedule(mcUrl)} />
+                        {/* Toggle + run button */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {!done && (
+                            <RunWarmupBtn profileId={acc.adspower_id || acc.id} mcUrl={mcUrl} onDone={() => fetchWarmupSchedule(mcUrl)} />
+                          )}
+                          <WarmupToggle profileId={acc.adspower_id || acc.id} enabled={!!(warmupSched || {})[acc.adspower_id || acc.id]?.enabled} mcUrl={mcUrl} done={done} onToggle={() => fetchWarmupSchedule(mcUrl)} />
+                        </div>
                       </div>
                     );
                   })}
@@ -556,11 +561,14 @@ export default function UGCPase() {
   );
 }
 
-// ─── Per-account warmup toggle (used in IG UGC page only) ────────────────────
+// ─── Per-account warmup controls (IG UGC page only) ─────────────────────────
+type WarmupStatus = 'idle' | 'running' | 'done' | 'error';
+
 function WarmupToggle({ profileId, enabled, mcUrl, done, onToggle }: {
   profileId: string; enabled: boolean; mcUrl: string; done: boolean; onToggle: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+
   const toggle = async () => {
     if (loading || done) return;
     setLoading(true);
@@ -576,20 +584,71 @@ function WarmupToggle({ profileId, enabled, mcUrl, done, onToggle }: {
     setLoading(false);
   };
 
-  if (done) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, opacity: 0.5 }}>
-        <CheckCircle size={14} style={{ color: '#10b981' }} />
-        <span style={{ fontSize: '11px', fontWeight: 700, color: '#10b981' }}>Auto</span>
-      </div>
-    );
-  }
+  return (
+    <button onClick={toggle} disabled={loading || done}
+      style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: loading || done ? 'not-allowed' : 'pointer',
+        background: done ? 'rgba(16,185,129,0.15)' : enabled ? '#a78bfa' : 'var(--surface-3)',
+        transition: 'background 0.2s', position: 'relative', flexShrink: 0, opacity: loading ? 0.6 : 1 }}>
+      <div style={{ width: 16, height: 16, borderRadius: '50%', background: done ? '#10b981' : 'white', position: 'absolute', top: 3, transition: 'left 0.2s', left: done ? 18 : enabled ? 20 : 3 }} />
+    </button>
+  );
+}
+
+function RunWarmupBtn({ profileId, mcUrl, onDone }: {
+  profileId: string; mcUrl: string; onDone: () => void;
+}) {
+  const [status, setStatus] = useState<WarmupStatus>('idle');
+  const [msg, setMsg] = useState('');
+
+  const runWarmup = async () => {
+    if (!confirm('Start 15-min warmup session for this account?\n\nWill open Instagram Explore, like ~30 posts. Instagram may flag if done too fast.')) return;
+    setStatus('running');
+    setMsg('');
+    try {
+      const res = await fetch(mcUrl + '/api/ig/warmup/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, duration_min: 15 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus('done');
+        setMsg('Session started — completes in ~15 min');
+      } else {
+        setStatus('error');
+        setMsg(data.error || 'Failed');
+      }
+    } catch (e: any) {
+      setStatus('error');
+      setMsg(e?.message || 'Connection failed');
+    }
+    setTimeout(() => setStatus('idle'), 8000);
+  };
 
   return (
-    <button onClick={toggle} disabled={loading}
-      style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-        background: enabled ? '#a78bfa' : 'var(--surface-3)', transition: 'background 0.2s', position: 'relative', flexShrink: 0, opacity: loading ? 0.6 : 1 }}>
-      <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'white', position: 'absolute', top: 3, transition: 'left 0.2s', left: enabled ? 20 : 3 }} />
-    </button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button
+        onClick={runWarmup}
+        disabled={status === 'running'}
+        style={{
+          height: 26, borderRadius: 6, border: 'none', cursor: status === 'running' ? 'not-allowed' : 'pointer',
+          background: status === 'done' ? 'rgba(16,185,129,0.15)' : status === 'error' ? 'rgba(239,68,68,0.1)' : '#a78bfa18',
+          color: status === 'done' ? '#10b981' : status === 'error' ? '#ef4444' : '#a78bfa',
+          fontSize: 11, fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', gap: 4,
+          transition: 'all 0.2s', fontFamily: 'inherit',
+        }}
+      >
+        {status === 'running' ? (
+          <><Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Running...</>
+        ) : status === 'done' ? (
+          <><CheckCircle size={10} /> Done</>
+        ) : status === 'error' ? (
+          <><AlertCircle size={10} /> Retry</>
+        ) : (
+          <>▶ Warmup</>
+        )}
+      </button>
+      {msg && <span style={{ fontSize: 10, color: status === 'error' ? '#ef4444' : 'var(--text-3)', maxWidth: 120 }}>{msg}</span>}
+    </div>
   );
 }

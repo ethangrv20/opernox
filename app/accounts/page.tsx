@@ -374,19 +374,13 @@ function AutoWarmupToggle({
 }
 
 // ─── Account Card ─────────────────────────────────────────────────────────────
-function AccountCard({ account, onEdit, onDelete, mcUrl, warmupSched, onRefreshSchedule }: {
+function AccountCard({ account, onEdit, onDelete }: {
   account: Account;
   onEdit: () => void;
   onDelete: () => void;
-  mcUrl: string;
-  warmupSched: Record<string, { enabled: boolean }>;
-  onRefreshSchedule: () => void;
 }) {
   const sinfo = systemInfo(account.account_system as AccountSystem);
-  const days = account.warmup_days_completed ?? getDaysActive(account.warmup_start_date);
   const isIg = account.account_system === 'ig_ugc' || account.account_system === 'ig_outreach';
-  const warmupDone = account.warmup_completed || days >= 7;
-  const warmupStarted = !!account.warmup_start_date;
 
   return (
     <motion.div
@@ -415,45 +409,6 @@ function AccountCard({ account, onEdit, onDelete, mcUrl, warmupSched, onRefreshS
           {sinfo.icon} {sinfo.label}
         </span>
       </div>
-
-      {/* Warmup Status — IG UGC only */}
-      {isIg && (
-        <div style={{ marginTop: 8 }}>
-          {warmupDone ? (
-            <div style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
-              ✓ Warmup complete — {days}/7 days
-            </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, marginBottom: 6 }}>
-                <span style={{ color: 'var(--text-2)' }}>Warmup</span>
-                <span style={{ color: '#a78bfa', fontWeight: 700 }}>Day {days} of 7</span>
-              </div>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: 20,
-                      height: 6,
-                      borderRadius: 3,
-                      background: i < days ? '#a78bfa' : 'var(--border)',
-                      transition: 'background 0.2s',
-                    }}
-                  />
-                ))}
-              </div>
-              <RunWarmupBtn account={account} mcUrl={mcUrl} />
-              <AutoWarmupToggle
-                profileId={account.adspower_id}
-                mcUrl={mcUrl}
-                enabled={!!warmupSched[account.adspower_id]?.enabled}
-                onToggle={() => onRefreshSchedule()}
-              />
-            </>
-          )}
-        </div>
-      )}
 
       {/* Meta */}
       <div className="acc-card__meta">Added {formatDate(account.created_at)}</div>
@@ -576,9 +531,6 @@ export default function AccountsPage() {
                   account={a}
                   onEdit={() => { setEditAccount(a); setShowAdd(true); }}
                   onDelete={() => deleteAccount(a.id)}
-                  mcUrl={mcUrl}
-                  warmupSched={warmupSched}
-                  onRefreshSchedule={() => fetchWarmupSchedule(mcUrl)}
                 />
               </div>
             ))}
