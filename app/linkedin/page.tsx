@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Linkedin, Send, Clock, CheckCircle, Plug, ChevronDown, Trash2, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#0ea5e9';
 
@@ -29,7 +30,7 @@ interface ScheduledPost {
 }
 
 export default function LinkedInPage() {
-  const [connection] = useState<LinkedInConnection | null>({ id: 'li-1', screen_name: 'grv_ethan', status: 'connected', connected_at: new Date().toISOString() });
+  const [connection, setConnection] = useState<LinkedInConnection | null>(null);
   const [postText, setPostText] = useState('');
   const [schedulingFor, setSchedulingFor] = useState('');
   const [isScheduling, setIsScheduling] = useState(false);
@@ -41,6 +42,7 @@ export default function LinkedInPage() {
   const [autoPost, setAutoPost] = useState({ morning: false, midday: false, evening: false });
   const [autoPostLinkedIn, setAutoPostLinkedIn] = useState(false);
   const [autoPostHourLinkedIn, setAutoPostHourLinkedIn] = useState(13);
+  const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
 
   const loadPosts = useCallback(async () => {
     setLoadingPosts(true);
@@ -54,19 +56,38 @@ export default function LinkedInPage() {
   }, []);
 
   useEffect(() => {
+    getMcUrl().then(url => setMcUrl(url));
+  }, []);
+
+  useEffect(() => {
     loadPosts();
     // Load LinkedIn auto-post state
-    fetch('http://127.0.0.1:3337/api/auto-post-state?platform=linkedin')
+    fetch(mcUrl + '/api/auto-post-state?platform=linkedin')
       .then(r => r.json())
       .then(data => { if (data.enabled !== undefined) { setAutoPostLinkedIn(data.enabled); setAutoPostHourLinkedIn(data.hourUtc || 13); } })
       .catch(() => {});
-  }, [loadPosts]);
+  }, [loadPosts, mcUrl]);
+
+  useEffect(() => {
+    // Load LinkedIn account from accounts table
+    supabase
+      .from('accounts')
+      .select('id, name, adspower_id, status, created_at')
+      .eq('account_system', 'linkedin')
+      .eq('status', 'active')
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setConnection({ id: data[0].id, screen_name: data[0].name || 'LinkedIn', status: 'connected', connected_at: data[0].created_at });
+        }
+      });
+  }, []);
 
   const handleAutoPostToggleLinkedIn = async () => {
     const newVal = !autoPostLinkedIn;
     setAutoPostLinkedIn(newVal);
     try {
-      const res = await fetch('http://127.0.0.1:3337/api/auto-post-state', {
+      const res = await fetch(mcUrl + '/api/auto-post-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform: 'linkedin', enabled: newVal, hourUtc: autoPostHourLinkedIn }),

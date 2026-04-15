@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Video, Clock, CheckCircle, Plug, Upload, Trash2, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#f43f5e';
 
@@ -32,6 +33,7 @@ export default function TikTokPage() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoName, setVideoName] = useState('');
+  const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadPosts = useCallback(async () => {
@@ -46,19 +48,26 @@ export default function TikTokPage() {
   }, []);
 
   useEffect(() => {
+    getMcUrl().then(url => setMcUrl(url));
+  }, []);
+
+  useEffect(() => {
     loadPosts();
+  }, [loadPosts]);
+
+  useEffect(() => {
     // Load auto-post state
-    fetch('http://127.0.0.1:3337/api/tiktok/auto-post')
+    fetch(mcUrl + '/api/tiktok/auto-post')
       .then(r => r.json())
       .then(data => { if (data.enabled !== undefined) { setAutoPostTikTok(data.enabled); setAutoPostHourTikTok(data.hourUtc || 14); } })
       .catch(() => {});
-  }, [loadPosts]);
+  }, [mcUrl]);
 
   const handleAutoPostToggleTikTok = async () => {
     const newVal = !autoPostTikTok;
     setAutoPostTikTok(newVal);
     try {
-      const res = await fetch('http://127.0.0.1:3337/api/tiktok/auto-post', {
+      const res = await fetch(mcUrl + '/api/tiktok/auto-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: newVal, hourUtc: autoPostHourTikTok }),
