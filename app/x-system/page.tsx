@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Twitter, Send, Clock, Plug, ChevronDown, User, CheckCircle, X as XIcon, Trash2, Zap, Calendar } from 'lucide-react';
+import { Twitter, Send, Clock, Plug, ChevronDown, User, CheckCircle, X as XIcon, Trash2, Zap, Calendar, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#06b6d4';
 
@@ -46,16 +47,51 @@ export default function XSystemPage() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [autoPost, setAutoPost] = useState({ morning: false, midday: false, evening: false });
   const [stats, setStats] = useState<PostStats>({ posts_today: 0, queue_count: 0, accounts_count: 0 });
+  const [connecting, setConnecting] = useState(false);
+  const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
+
+  // Connect X via Twitter OAuth
+  const handleConnectX = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setConnecting(true);
+    try {
+      const res = await fetch(mcUrl + '/api/x/oauth/authorize?user_id=' + user.id);
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        alert('Failed to start X OAuth: ' + (data.error || 'Unknown error'));
+        setConnecting(false);
+      }
+    } catch (e: any) {
+      alert('Failed to connect X: ' + e.message);
+      setConnecting(false);
+    }
+  };
 
   // Load X connection
   useEffect(() => {
-    supabase
-      .from('x_connections')
-      .select('*')
-      .single()
-      .then(({ data }) => {
-        if (data) setConnection(data);
-      });
+    getMcUrl().then(url => setMcUrl(url));
+  }, []);
+    const loadConnection = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('x_connections')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      if (data) setConnection(data);
+    };
+    loadConnection();
+
+    // Handle OAuth callback params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('oauth_success')) {
+      loadConnection();
+      window.history.replaceState({}, '', '/x-system');
+    }
   }, []);
 
   // Load scheduled posts
@@ -86,11 +122,15 @@ export default function XSystemPage() {
       .gte('published_at', today)
       .then(({ count }) => setStats(s => ({ ...s, posts_today: count || 0 })));
     // Accounts count
-    supabase
-      .from('x_connections')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'connected')
-      .then(({ count }) => setStats(s => ({ ...s, accounts_count: count || 0 })));
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      supabase
+        .from('x_connections')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'connected')
+        .then(({ count }) => setStats(s => ({ ...s, accounts_count: count || 0 })));
+    }
   }, [loadPosts]);
 
   // Post immediately
@@ -207,8 +247,11 @@ export default function XSystemPage() {
               <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-3)' }}>Not connected</span>
             </div>
           )}
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', fontFamily: 'inherit' }}>
-            <Plug size={12} /> Connect
+          <button
+            onClick={handleConnectX}
+            disabled={connecting}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border-2)', background: 'transparent', cursor: connecting ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', fontFamily: 'inherit', opacity: connecting ? 0.6 : 1 }}>
+            {connecting ? <Loader2 size={12} className="spin" /> : <Plug size={12} />} {connecting ? 'Connecting...' : 'Connect'}
           </button>
         </div>
       </div>
@@ -231,8 +274,11 @@ export default function XSystemPage() {
             <div style={{ fontSize: '13px', color: 'var(--text-3)', maxWidth: 320, margin: '0 auto 20px', lineHeight: 1.65 }}>
               Link your X/Twitter account to schedule posts, manage your queue, and track performance analytics.
             </div>
-            <button style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'white', fontFamily: 'inherit' }}>
-              <Plug size={13} /> Connect X
+            <button
+              onClick={handleConnectX}
+              disabled={connecting}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 20px', borderRadius: 'var(--radius-sm)', background: ACCENT, border: 'none', cursor: connecting ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 700, color: 'white', fontFamily: 'inherit', opacity: connecting ? 0.6 : 1 }}>
+              {connecting ? <><Loader2 size={13} className="spin" /> Connecting...</> : <><Plug size={13} /> Connect X</>}
             </button>
           </motion.div>
         )}
