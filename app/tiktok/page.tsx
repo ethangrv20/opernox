@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Video, Clock, CheckCircle, Plug, Upload, Trash2, Calendar } from 'lucide-react';
+import { Video, Clock, CheckCircle, AlertCircle, Plug, Upload, Trash2, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getMcUrl } from '@/lib/mc-url';
 
@@ -27,6 +27,7 @@ export default function TikTokPage() {
   const [autoPostTikTok, setAutoPostTikTok] = useState(false);
   const [autoPostHourTikTok, setAutoPostHourTikTok] = useState(14);
   const [isPostingNow, setIsPostingNow] = useState(false);
+  const [tiktokConnected, setTiktokConnected] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [postMsg, setPostMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
@@ -52,8 +53,16 @@ export default function TikTokPage() {
   }, []);
 
   useEffect(() => {
+    // Check if TikTok account is connected
+    supabase
+      .from('accounts')
+      .select('id')
+      .eq('account_system', 'tiktok_ugc')
+      .eq('status', 'active')
+      .limit(1)
+      .then(({ data }) => setTiktokConnected(!!(data && data.length > 0)));
     loadPosts();
-  }, [loadPosts]);
+  }, []);
 
   useEffect(() => {
     // Load auto-post state
@@ -165,7 +174,7 @@ export default function TikTokPage() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ` at ${time}`;
   };
 
-  const isConnected = true; // AdsPower handles auth via browser
+  const isConnected = tiktokConnected; // AdsPower handles auth via browser
 
   return (
     <div>
@@ -173,12 +182,17 @@ export default function TikTokPage() {
         <div className="topbar-title">TikTok UGC</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 12px' }}>
-            <CheckCircle size={12} style={{ color: '#10b981' }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>Connected</span>
+            {isConnected ? (
+              <><CheckCircle size={12} style={{ color: '#10b981' }} /><span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>Connected</span></>
+            ) : (
+              <><AlertCircle size={12} style={{ color: '#ef4444' }} /><span style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444' }}>Not Connected</span></>
+            )}
           </div>
+          {!isConnected && (
           <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border-2)', background: 'transparent', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', fontFamily: 'inherit' }}>
             <Plug size={12} /> Connect
           </button>
+          )}
         </div>
       </div>
 

@@ -213,6 +213,27 @@ function AccountModal({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // One-account limit for X and LinkedIn
+      if (!existing) {
+        if (form.account_system === 'x') {
+          const { data: existingX } = await supabase.from('x_connections').select('id').limit(1);
+          if (existingX && existingX.length > 0) {
+            setError('Only one X account allowed. Edit or delete the existing account first.');
+            setLoading(false);
+            return;
+          }
+        }
+        if (form.account_system === 'linkedin') {
+          const { data: existingLi } = await supabase.from('accounts').select('id').eq('account_system', 'linkedin').eq('user_id', user.id).limit(1);
+          if (existingLi && existingLi.length > 0) {
+            setError('Only one LinkedIn account allowed. Edit or delete the existing account first.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const payload = {
         user_id: user.id,
         name: form.name,
