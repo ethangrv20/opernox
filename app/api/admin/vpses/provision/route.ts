@@ -124,105 +124,94 @@ function genPassword() {
   return Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-// ── Spawn background WinRM bootstrapper ───────────────────────────────────────
+// ── WinRM Bootstrapper (writes a separate .ps1 file to avoid escaping issues) ─
 
-function spawnBootstrap(vpsIp: string, rootpass: string, userId: string, vpsRecordId: string, hostname: string) {
-  // Write bootstrap script to a temp file so we can pass it via -File (more reliable than -Command)
-  const bootstrapScriptPath = path.join('C:\\temp', `bootstrap-${vpsRecordId}.ps1`);
-  const thisBootstrapScript = fs.readFileSync(
-    path.join(process.cwd(), 'vps-agent', 'bootstrap.ps1'),
-    'utf8'
-  );
-  fs.writeFileSync(bootstrapScriptPath, thisBootstrapScript, 'utf8');
+function spawnBootstrap(
+  vpsIp: string,
+  rootpass: string,
+  userId: string,
+  vpsRecordId: string,
+  hostname: string,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  bootstrapScriptPath: string
+) {
+  // Write the WinRM runner script to C:\temp
+  // This script waits for VPS to be reachable then runs bootstrap.ps1 via WinRM
+  const runnerContent = [
+    '$ErrorActionPreference = "Continue"',
+    '$vpsIp = "' + vpsIp + '"',
+    '$rootpass = "' + rootpass + '"',
+    '$userId = "' + userId + '"',
+    '$vpsRecordId = "' + vpsRecordId + '"',
+    '$hostname = "' + hostname + '"',
+    '$SupabaseUrl = "' + supabaseUrl + '"',
+    '$ServiceRoleKey = "' + serviceRoleKey + '"',
+    '$BootstrapScript = "' + bootstrapScriptPath.replace(/\\/g, '\\\\') + '"',
+    '$LOG = "C:\\temp\\bootstrap-log-' + vpsRecordId + '.txt"',
+    '',
+    'function Write-Log { param($Msg) $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"; "[$ts] $Msg" | Out-File -FilePath $LOG -Append -Encoding UTF8; Write-Host "[$ts] $Msg" }',
+    '',
+    'Write-Log "=== WinRM Bootstrapper Started for ${hostname} (${vpsIp}) ==="',
+    '',
+    '# Create credential',
+    '$secPass = ConvertTo-SecureString "$rootpass" -AsPlainText -Force',
+    '$cred = New-Object System.Management.Automation.PSCredential("Administrator", $secPass)',
+    '',
+    '# Wait for VPS to be reachable via WinRM (Interserver takes ~10-15 min to boot)',
+    '$maxWait = 20',
+    '$waited = 0',
+    '$reachable = $false',
+    '',
+    'Write-Log "Waiting for VPS to be reachable via WinRM..."',
+    'while ($waited -lt $maxWait) {',
+    '  try {',
+    '    $test = Invoke-Command -ComputerName $vpsIp -Credential $cred -Port 5985 -TimeoutSec 10 -ScriptBlock { $env:COMPUTERNAME }',
+    '    if ($test) { Write-Log "VPS is online! (waited $($waited * 30)s)"; $reachable = $true; break }',
+    '  } catch {',
+    '    Write-Log "Not reachable yet (attempt $($waited+1)/$maxWait): $($_.Exception.Message -split \'\\n\')[0]"',
+    '  }',
+    '  Start-Sleep 30',
+    '  $waited++',
+    '}',
+    '',
+    'if (-not $reachable) { Write-Log "ERROR: VPS never became reachable."; exit 1 }',
+    '',
+    '# Copy bootstrap script to VPS via WinRM',
+    'Write-Log "Copying bootstrap script to VPS..."',
+    'try {',
+    '  $session = New-PSSession -ComputerName $vpsIp -Credential $cred -Port 5985',
+    '  Copy-Item -Path $BootstrapScript -Destination "C:\\temp\\bootstrap-run.ps1" -ToSession $session -Force',
+    '  Write-Log "Bootstrap script copied."',
+    '} catch {',
+    '  Write-Log "ERROR: Failed to copy bootstrap script: $($_.Exception.Message -split \'\\n\')[0]"; exit 1',
+    '}',
+    '',
+    '# Run bootstrap.ps1 via WinRM',
+    'Write-Log "Executing bootstrap.ps1 on VPS..."',
+    'try {',
+    '  Invoke-Command -ComputerName $vpsIp -Credential $cred -Port 5985 ',
+    '    -SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck) ',
+    '    -ScriptBlock {',
+    '      Set-ExecutionPolicy Bypass -Scope Process -Force',
+    '      & "C:\\temp\\bootstrap-run.ps1" -SupabaseUrl $using:SupabaseUrl -ServiceRoleKey $using:ServiceRoleKey -UserId $using:userId -VpsHostname $using:hostname',
+    '  } 2>&1 | ForEach-Object { Write-Log "[VPS] $_" }',
+    '  Write-Log "Bootstrap completed."',
+    '} catch {',
+    '  Write-Log "ERROR: Bootstrap failed: $($_.Exception.Message -split \'\\n\')[0]"; exit 1',
+    '}',
+    '',
+    'Remove-PSSession $session -ErrorAction SilentlyContinue',
+    'Remove-Item $BootstrapScript -Force -ErrorAction SilentlyContinue',
+    'Write-Log "Done."',
+  ].join('\r\n');
 
-  // Build the WinRM bootstrapper PowerShell script as a string
-  const psScript = `
-$ErrorActionPreference = "Continue"
-$vpsIp = "${vpsIp}"
-$rootpass = "${rootpass}"
-$userId = "${userId}"
-$vpsRecordId = "${vpsRecordId}"
-$hostname = "${hostname}"
-$SupabaseUrl = "${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujdegmhsvwymxzezwwna.supabase.co'}"
-$ServiceRoleKey = "${process.env.SUPABASE_SERVICE_ROLE_KEY || ''}"
-$BootstrapScript = "${bootstrapScriptPath.replace(/\\/g, '\\\\')}"
-$LOG = "C:\\temp\\bootstrap-log-${vpsRecordId}.txt"
-
-function Write-Log { param($Msg) $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"; "[$ts] $Msg" | Out-File -FilePath $LOG -Append -Encoding UTF8; Write-Host "[$ts] $Msg" }
-
-Write-Log "=== WinRM Bootstrapper Started for ${hostname} (${vpsIp}) ==="
-
-# Create credential
-$secPass = ConvertTo-SecureString "$rootpass" -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential("Administrator", $secPass)
-
-# Wait for VPS to be reachable via WinRM (Interserver takes ~10-15 min to boot)
-$maxWait = 20   # 20 x 30s = 10 minutes max wait
-$waited = 0
-$reachable = $false
-
-Write-Log "Waiting for VPS to be reachable via WinRM..."
-while ($waited -lt $maxWait) {
-  try {
-    $test = Invoke-Command -ComputerName $vpsIp -Credential $cred -Port 5985 -TimeoutSec 10 -ScriptBlock { $env:COMPUTERNAME }
-    if ($test) {
-      Write-Log "VPS is online! (waited $(${waited} * 30)s)"
-      $reachable = $true
-      break
-    }
-  } catch {
-    Write-Log "Not reachable yet (attempt $($waited+1)/$maxWait): $($_.Exception.Message -split '\\n')[0]"
-  }
-  Start-Sleep 30
-  $waited++
-}
-
-if (-not $reachable) {
-  Write-Log "ERROR: VPS never became reachable via WinRM after ${maxWait} attempts. Giving up."
-  exit 1
-}
-
-# Copy bootstrap script to VPS via WinRM
-Write-Log "Copying bootstrap script to VPS..."
-try {
-  $session = New-PSSession -ComputerName $vpsIp -Credential $cred -Port 5985
-  Copy-Item -Path $BootstrapScript -Destination "C:\\temp\\bootstrap-run.ps1" -ToSession $session -Force
-  Write-Log "Bootstrap script copied."
-} catch {
-  Write-Log "ERROR: Failed to copy bootstrap script: $($_.Exception.Message -split '\\n')[0]"
-  exit 1
-}
-
-# Run bootstrap.ps1 via WinRM
-Write-Log "Executing bootstrap.ps1 on VPS..."
-try {
-  Invoke-Command -ComputerName $vpsIp -Credential $cred -Port 5985 -SessionOption (New-PSSessionOption -SkipCACheck -SkipCNCheck) -ScriptBlock {
-    Set-ExecutionPolicy Bypass -Scope Process -Force
-    & "C:\\temp\\bootstrap-run.ps1" `
-      -SupabaseUrl $using:SupabaseUrl `
-      -ServiceRoleKey $using:ServiceRoleKey `
-      -UserId $using:userId `
-      -VpsHostname $using:hostname
-  } 2>&1 | ForEach-Object { Write-Log "[VPS] $_" }
-
-  Write-Log "Bootstrap completed successfully."
-} catch {
-  Write-Log "ERROR: Bootstrap failed: $($_.Exception.Message -split '\\n')[0]"
-  exit 1
-}
-
-# Clean up
-Remove-PSSession $session -ErrorAction SilentlyContinue
-Remove-Item $BootstrapScript -Force -ErrorAction SilentlyContinue
-Write-Log "Done."
-`;
-
-  const psScriptPath = path.join('C:\\temp', `winrm-bootstrap-${vpsRecordId}.ps1`);
-  fs.writeFileSync(psScriptPath, `\ufeff${psScript}`, 'utf8'); // BOM for PowerShell compat
+  const runnerPath = path.join('C:\\temp', `winrm-bootstrap-${vpsRecordId}.ps1`);
+  fs.writeFileSync(runnerPath, '\ufeff' + runnerContent, 'utf8');
 
   const ps = spawn('powershell.exe', [
     '-ExecutionPolicy', 'Bypass',
-    '-File', psScriptPath
+    '-File', runnerPath,
   ], {
     detached: true,
     stdio: 'ignore',
@@ -242,11 +231,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'user_id required' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujdegmhsvwymxzezwwna.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    { auth: { persistSession: false } }
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujdegmhsvwymxzezwwna.supabase.co';
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
   // 1. Fetch user profile
   const { data: profile, error: profileError } = await supabase
@@ -337,23 +325,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `DB insert failed: ${vpsError.message}` }, { status: 500 });
   }
 
-  // 6. Get the public IP from Interserver (may not be immediately available)
-  // We'll pass hostname + rootpass to the bootstrapper — it resolves IP via api.ipify.org on the VPS itself
+  // 6. Spawn background WinRM bootstrapper
+  // Copy bootstrap.ps1 to C:\temp so the runner can send it to the VPS
+  const bootstrapScriptSrc = path.join(process.cwd(), 'vps-agent', 'bootstrap.ps1');
+  const bootstrapScriptDest = path.join('C:\\temp', `bootstrap-${vpsRecord.id}.ps1`);
 
-  // 7. Spawn background WinRM bootstrapper
-  // The bootstrapper waits for the VPS to boot, then WinRMs in and runs bootstrap.ps1
-  // We use the hostname as the identifier — the bootstrap script resolves the IP via ipify on the VPS side
   try {
-    spawnBootstrap(hostname, rootpass, user_id, vpsRecord.id, hostname);
+    fs.copyFileSync(bootstrapScriptSrc, bootstrapScriptDest);
   } catch (err: any) {
-    console.error('[Provision] Failed to spawn bootstrapper:', err);
-    // Don't fail the request — the VPS was ordered. Bootstrap can be retried manually.
+    console.error('[Provision] Could not copy bootstrap script:', err);
     return NextResponse.json({
       success: true,
       vpsId: vpsRecord.id,
       orderId,
       hostname,
-      warning: `VPS ordered but bootstrapper failed to spawn: ${err.message}. Bootstrap can be retried via /api/admin/vpses/${vpsRecord.id}/bootstrap`,
+      warning: `VPS ordered but bootstrap script copy failed: ${err.message}`,
+    });
+  }
+
+  try {
+    spawnBootstrap(hostname, rootpass, user_id, vpsRecord.id, hostname, supabaseUrl, serviceRoleKey, bootstrapScriptDest);
+  } catch (err: any) {
+    console.error('[Provision] Failed to spawn bootstrapper:', err);
+    return NextResponse.json({
+      success: true,
+      vpsId: vpsRecord.id,
+      orderId,
+      hostname,
+      warning: `VPS ordered but bootstrapper failed to spawn: ${err.message}. Bootstrap can be retried.`,
     });
   }
 
