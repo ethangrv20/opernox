@@ -8,13 +8,14 @@ const ACCENT = '#ec4899';
 
 interface IGAccount {
   id: string;
+  name?: string;
   username: string;
+  adspower_id?: string;
   status: string;
   days_active?: number;
   current_daily_limit?: number;
   warmup_completed?: boolean;
   warmup_days_completed?: number;
-  adspower_id?: string;
 }
 
 interface UGCRunState {
@@ -325,7 +326,7 @@ export default function UGCPase() {
                       <div key={acc.id} style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
                         {/* Account info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.username || acc.id}</div>
+                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name || acc.username || acc.id}</div>
                           {!done && (
                             <div style={{ display: 'flex', gap: 3 }}>
                               {Array.from({ length: 7 }).map((_, i) => (
