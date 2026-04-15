@@ -71,18 +71,24 @@ export default function UGCPase() {
   const loadState = useCallback(async () => {
     try {
       const [autoRes, accRes] = await Promise.all([
-        fetch(mcUrl + '/api/instagram/auto-post').then(r => r.json()),
-        fetch(mcUrl + '/api/ugc/accounts').then(r => r.json()),
+        fetch(mcUrl + '/api/instagram/auto-post').catch(() => null),
+        fetch(mcUrl + '/api/ugc/accounts').catch(() => null),
       ]);
-      if (autoRes.enabled !== undefined) {
+      const autoJson = autoRes ? await autoRes.json().catch(() => null) : null;
+      const accJson = accRes ? await accRes.json().catch(() => null) : null;
+      if (autoJson && typeof autoJson === 'object' && 'enabled' in autoJson) {
         setAutoPost(prev => ({
           ...prev,
-          enabled: autoRes.enabled,
-          hourUtc: autoRes.hourUtc || 14,
+          enabled: (autoJson as any).enabled,
+          hourUtc: (autoJson as any).hourUtc || 14,
         }));
       }
-      setAccounts(accRes.accounts || []);
-    } catch { /* MC not reachable */ }
+      if (accJson && typeof accJson === 'object' && 'accounts' in accJson) {
+        setAccounts((accJson as any).accounts || []);
+      }
+    } catch (e) {
+      console.error('loadState error:', e);
+    }
   }, []);
 
   // Poll run state
@@ -141,11 +147,15 @@ export default function UGCPase() {
   }, []);
 
   useEffect(() => {
+    if (!mcUrl) return;
     loadState();
+  }, [mcUrl, loadState]);
+
+  useEffect(() => {
     pollRunState();
     const interval = setInterval(pollRunState, 4000);
     return () => clearInterval(interval);
-  }, [loadState, pollRunState]);
+  }, [pollRunState]);
 
   const handleAutoPostToggle = async () => {
     setLoadingAuto(true);
