@@ -1,7 +1,7 @@
 ﻿'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Clock, CheckCircle, AlertCircle, Play, Square, Zap, Instagram, RefreshCw } from 'lucide-react';
+import { Video, Clock, CheckCircle, AlertCircle, Play, Square, Zap, Instagram, RefreshCw, Shield, ShieldCheck } from 'lucide-react';
 import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#ec4899';
@@ -14,6 +14,7 @@ interface IGAccount {
   current_daily_limit?: number;
   warmup_completed?: boolean;
   warmup_days_completed?: number;
+  adspower_id?: string;
 }
 
 interface UGCRunState {
@@ -57,6 +58,7 @@ export default function UGCPase() {
   });
   const [manualRunning, setManualRunning] = useState(false);
   const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
+  const [warmupSched, setWarmupSched] = useState<Record<string, { enabled: boolean }>>({});
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'ok' | 'error', text: string) => {
@@ -102,6 +104,17 @@ export default function UGCPase() {
     } catch { /* ignore */ }
   }, []);
 
+  // Fetch warmup schedule from VPS scheduler
+  const fetchWarmupSchedule = useCallback(async (url: string) => {
+    try {
+      const res = await fetch(url + '/api/ig/warmup/schedule');
+      if (res.ok) {
+        const data = await res.json();
+        setWarmupSched(data as Record<string, { enabled: boolean }>);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     getMcUrl().then(url => {
       setMcUrl(url);
@@ -121,6 +134,8 @@ export default function UGCPase() {
           }
         })
         .catch(() => {});
+      // Load warmup schedule for IG accounts
+      fetchWarmupSchedule(url);
     });
   }, []);
 
@@ -227,19 +242,115 @@ export default function UGCPase() {
         </div>
       </div>
 
-      {/* Warmup warning if no accounts are warmed up */}
-      {(() => {
-      const warmedCount = accounts.filter(a => a.warmup_completed || (a.warmup_days_completed || 0) >= 7).length;
-      if (warmedCount > 0) return null;
-      return (
-        <div style={{ margin: '12px 24px', padding: '10px 16px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <AlertCircle size={14} style={{ color: '#f59e0b', marginTop: 2, flexShrink: 0 }} />
-          <div style={{ fontSize: 12, color: '#92400e' }}>
-            <strong>No accounts warmed up.</strong> Complete warmup (7 days) before running campaigns — accounts are blocked until then.
-          </div>
+      {/* Warmup control panel — only shown on IG UGC page */}
+      {accounts.length > 0 && (
+        <div style={{ margin: '0 24px 20px' }}>
+          {(() => {
+            const accountsData = accounts;
+            const warmedCount = accountsData.filter(a => a.warmup_completed || (a.warmup_days_completed || 0) >= 7).length;
+            const inProgressCount = accountsData.filter(a => a.warmup_days_completed && (a.warmup_days_completed || 0) < 7 && !a.warmup_completed).length;
+            const neverCount = accountsData.filter(a => !a.warmup_days_completed || a.warmup_days_completed === 0).length;
+            const allWarmed = warmedCount === accountsData.length && accountsData.length > 0;
+
+            if (allWarmed) {
+              return (
+                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ShieldCheck size={18} style={{ color: '#10b981' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#10b981', marginBottom: 2 }}>All accounts warmed up</div>
+                    <div style={{ fontSize: '11.5px', color: 'rgba(16,185,129,0.7)' }}>{warmedCount}/{accountsData.length} accounts complete — campaigns unlocked</div>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px' }}>
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#a78bfa18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Shield size={16} style={{ color: '#a78bfa' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', marginBottom: 1 }}>Instagram Warmup</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>7 days per account — auto-warms daily</div>
+                    </div>
+                  </div>
+                  {/* Status badge */}
+                  {warmedCount > 0 ? (
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(16,185,129,0.25)' }}>
+                      {warmedCount}/{accountsData.length} Ready
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(245,158,11,0.25)' }}>
+                      Not Started
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress stats */}
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                  <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>{warmedCount}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: 600, marginTop: 3 }}>COMPLETE</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#f59e0b', lineHeight: 1 }}>{inProgressCount}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: 600, marginTop: 3 }}>IN PROGRESS</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-3)', lineHeight: 1 }}>{neverCount}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: 600, marginTop: 3 }}>NOT STARTED</div>
+                  </div>
+                </div>
+
+                {/* Block warning */}
+                {warmedCount === 0 && (
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-3)', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <AlertCircle size={13} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                    <span>Accounts need 7-day warmup before campaigns can run. Enable auto-warmup below.</span>
+                  </div>
+                )}
+
+                {/* Account rows with auto-warmup toggles */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {accountsData.map(acc => {
+                    const days = acc.warmup_days_completed || 0;
+                    const done = acc.warmup_completed || days >= 7;
+                    const inProgress = days > 0 && !done;
+                    return (
+                      <div key={acc.id} style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {/* Account info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.username || acc.id}</div>
+                          {!done && (
+                            <div style={{ display: 'flex', gap: 3 }}>
+                              {Array.from({ length: 7 }).map((_, i) => (
+                                <div key={i} style={{ width: 18, height: 4, borderRadius: 2, background: i < days ? '#a78bfa' : 'var(--border)' }} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* Day badge */}
+                        {done ? (
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '3px 8px', borderRadius: 99 }}>Done</div>
+                        ) : (
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa' }}>Day {days}/7</div>
+                        )}
+                        {/* Toggle */}
+                        <WarmupToggle profileId={acc.adspower_id || acc.id} enabled={!!(warmupSched || {})[acc.adspower_id || acc.id]?.enabled} mcUrl={mcUrl} done={done} onToggle={() => fetchWarmupSchedule(mcUrl)} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
-      );
-      })()}
+      )}
 
       <div className="page-content">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 24 }}>
@@ -429,14 +540,8 @@ export default function UGCPase() {
                     <Instagram size={14} style={{ color: ACCENT }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>@{acc.username}
-                      {acc.warmup_completed || (acc.warmup_days_completed || 0) >= 7 ? (
-                        <span style={{ marginLeft: 6, fontSize: 10, background: '#dcfce7', color: '#16a34a', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>WARMED</span>
-                      ) : (
-                        <span style={{ marginLeft: 6, fontSize: 10, background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>DAY {acc.warmup_days_completed || 0}/7</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{acc.days_active || 0} days active Â· limit {acc.current_daily_limit || '?'}/day</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>@{acc.username}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{acc.days_active || 0} days active · limit {acc.current_daily_limit || '?'}/day</div>
                   </div>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: acc.status === 'active' ? '#10b981' : '#f59e0b' }} />
                 </div>
@@ -448,5 +553,43 @@ export default function UGCPase() {
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+// ─── Per-account warmup toggle (used in IG UGC page only) ────────────────────
+function WarmupToggle({ profileId, enabled, mcUrl, done, onToggle }: {
+  profileId: string; enabled: boolean; mcUrl: string; done: boolean; onToggle: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const toggle = async () => {
+    if (loading || done) return;
+    setLoading(true);
+    try {
+      const next = !enabled;
+      await fetch(mcUrl + '/api/ig/warmup/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, enabled: next }),
+      });
+      onToggle();
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  if (done) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, opacity: 0.5 }}>
+        <CheckCircle size={14} style={{ color: '#10b981' }} />
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#10b981' }}>Auto</span>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={toggle} disabled={loading}
+      style={{ width: 40, height: 22, borderRadius: 99, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+        background: enabled ? '#a78bfa' : 'var(--surface-3)', transition: 'background 0.2s', position: 'relative', flexShrink: 0, opacity: loading ? 0.6 : 1 }}>
+      <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'white', position: 'absolute', top: 3, transition: 'left 0.2s', left: enabled ? 20 : 3 }} />
+    </button>
   );
 }
