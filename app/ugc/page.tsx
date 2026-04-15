@@ -60,6 +60,7 @@ export default function UGCPase() {
   const [manualRunning, setManualRunning] = useState(false);
   const [mcUrl, setMcUrl] = useState('http://127.0.0.1:3337');
   const [warmupSched, setWarmupSched] = useState<Record<string, { enabled: boolean }>>({});
+  const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'ok' | 'error', text: string) => {
@@ -69,13 +70,18 @@ export default function UGCPase() {
 
   // Load auto-post state + IG accounts
   const loadState = useCallback(async () => {
+    const url = mcUrl;
+    console.log('[UGC] loadState called, mcUrl:', url);
     try {
       const [autoRes, accRes] = await Promise.all([
-        fetch(mcUrl + '/api/instagram/auto-post').catch(() => null),
-        fetch(mcUrl + '/api/ugc/accounts').catch(() => null),
+        fetch(url + '/api/instagram/auto-post', { cache: 'no-store' }).catch(() => null),
+        fetch(url + '/api/ugc/accounts', { cache: 'no-store' }).catch(() => null),
       ]);
+      console.log('[UGC] auto-post response:', autoRes?.status, autoRes?.ok);
+      console.log('[UGC] ugc/accounts response:', accRes?.status, accRes?.ok);
       const autoJson = autoRes ? await autoRes.json().catch(() => null) : null;
       const accJson = accRes ? await accRes.json().catch(() => null) : null;
+      console.log('[UGC] ugc/accounts data:', JSON.stringify(accJson));
       if (autoJson && typeof autoJson === 'object' && 'enabled' in autoJson) {
         setAutoPost(prev => ({
           ...prev,
@@ -84,10 +90,14 @@ export default function UGCPase() {
         }));
       }
       if (accJson && typeof accJson === 'object' && 'accounts' in accJson) {
+        console.log('[UGC] setting accounts:', (accJson as any).accounts);
         setAccounts((accJson as any).accounts || []);
+      } else {
+        console.log('[UGC] accJson was:', accJson);
       }
     } catch (e) {
-      console.error('loadState error:', e);
+      console.error('[UGC] loadState error:', e);
+      setLoadError('Failed to load accounts');
     }
   }, []);
 
@@ -124,8 +134,8 @@ export default function UGCPase() {
 
   useEffect(() => {
     getMcUrl().then(url => {
+      console.log('[UGC] getMcUrl resolved to:', url);
       setMcUrl(url);
-      // Load campaign schedule from VPS scheduler
       fetch(url + '/api/campaigns/schedule')
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -141,7 +151,6 @@ export default function UGCPase() {
           }
         })
         .catch(() => {});
-      // Load warmup schedule for IG accounts
       fetchWarmupSchedule(url);
     });
   }, []);
@@ -254,6 +263,11 @@ export default function UGCPase() {
       </div>
 
       {/* Warmup control panel — only shown on IG UGC page */}
+      {loadError && (
+        <div style={{ margin: '0 24px 12px', padding: '10px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, fontSize: '12px', color: '#ef4444' }}>
+          {loadError} — MC may be unreachable. Check console (F12) for details.
+        </div>
+      )}
       {accounts.length > 0 && (
         <div style={{ margin: '0 24px 20px' }}>
           {(() => {
