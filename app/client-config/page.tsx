@@ -437,7 +437,7 @@ export default function ClientConfigPage() {
                   3. Application type: select <strong>"Web application"</strong><br />
                   4. Name it anything (e.g. "Opernox SEO")<br />
                   5. Under <strong>"Authorized redirect URIs"</strong> — click <strong>"+ Add URI"</strong> and paste this exact URL:<br />
-                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '3px 8px', borderRadius: 4, fontSize: 11, color: '#10b981', display: 'block', marginTop: 4, wordBreak: 'break-all' }}>{typeof window !== 'undefined' ? window.location.origin : ''}/api/gsc/callback</code>
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '3px 8px', borderRadius: 4, fontSize: 11, color: '#10b981', display: 'block', marginTop: 4, wordBreak: 'break-all' }}>{typeof window !== 'undefined' ? (window.location.origin.includes('vercel') ? 'https://mc.opernox.com' : window.location.origin) : 'https://mc.opernox.com'}/api/gsc/callback</code>
                   6. Click <strong>"Create"</strong><br />
                   7. Google will show you a <strong>"Client ID"</strong> and <strong>"Client Secret"</strong> — copy both into the fields below
                 </div>
