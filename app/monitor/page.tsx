@@ -577,8 +577,8 @@ export default function MonitorPage() {
             {/* GSC not connected at all */}
             {!gscData?.connected && !gscLoading && (
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Connect Google Search Console to see real keyword data</div>
-                <div style={{ fontSize: 12, color: '#4b5563' }}>Set up in <a href="/client-config" style={{ color: '#3b82f6' }}>Client Config → Google Search Console</a></div>
+                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Google Search Console not connected</div>
+                <div style={{ fontSize: 12, color: '#4b5563' }}>Set up in <a href="/client-config" style={{ color: '#3b82f6' }}>Client Config → Google Search Console</a> to see real organic keyword data</div>
               </div>
             )}
 
@@ -663,7 +663,7 @@ export default function MonitorPage() {
               <div style={{ textAlign: 'center', padding: 60, color: '#4b5563' }}>
                 <TrendingUp size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
                 <p style={{ fontSize: 15, margin: '0 0 6px' }}>No ranking data yet</p>
-                <p style={{ fontSize: 13, margin: 0 }}>Rankings appear after keywords are tracked for a while</p>
+                <p style={{ fontSize: 13, margin: 0 }}>Rankings are checked when you click 🔍 Check on a keyword above</p>
               </div>
             ) : (
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
@@ -731,7 +731,8 @@ export default function MonitorPage() {
               <div style={{ textAlign: 'center', padding: 60, color: '#4b5563' }}>
                 <Rss size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
                 <p style={{ fontSize: 15, margin: '0 0 6px' }}>No mentions found</p>
-                <p style={{ fontSize: 13, margin: 0 }}>Mentions appear when your brand is discussed online</p>
+                <p style={{ fontSize: 13, margin: 0 }}>Brand mentions are scraped from Google News & Reddit via browser automation.</p>
+                <p style={{ fontSize: 12, color: '#374151', marginTop: 8, padding: '8px 14px', background: 'rgba(59,130,246,0.07)', borderRadius: 8, display: 'inline-block' }}>⚠️ Requires AdsPower browser running on this VPS</p>
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 10 }}>
@@ -786,8 +787,9 @@ export default function MonitorPage() {
               reviews.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 60, color: '#4b5563' }}>
                   <Star size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                  <p style={{ fontSize: 15, margin: '0 0 6px' }}>No reviews tracked yet</p>
-                  <p style={{ fontSize: 13, margin: 0 }}>Reviews from Google, Yelp, Trustpilot & G2 will appear here</p>
+                  <p style={{ fontSize: 15, margin: '0 0 6px' }}>No reviews yet</p>
+                  <p style={{ fontSize: 13, margin: 0 }}>Reviews are scraped from Google, Yelp & Trustpilot via browser automation.</p>
+                  <p style={{ fontSize: 12, color: '#374151', marginTop: 8, padding: '8px 14px', background: 'rgba(251,191,36,0.07)', borderRadius: 8, display: 'inline-block' }}>⚠️ Requires AdsPower browser running on this VPS</p>
                 </div>
               ) : (
                 <div>
