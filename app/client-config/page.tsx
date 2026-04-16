@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Save, Plus, Trash2, CheckCircle, AlertTriangle, ChevronRight } from 'lucide-react';
+import { getMcUrl } from '@/lib/mc-url';
 
 const ACCENT = '#06b6d4';
 const SECTIONS = [
@@ -106,10 +107,11 @@ export default function ClientConfigPage() {
       setMsg({ type: 'error', text: `Google connection failed: ${decodeURIComponent(reason)}` });
       window.history.replaceState({}, '', '/client-config');
     }
-    fetch('http://127.0.0.1:3337/api/client-config')
-      .then(r => r.json())
-      .then(data => {
-        if (!data.client) { setLoading(false); return; }
+    getMcUrl().then(url => {
+      fetch(`${url}/api/client-config`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.client) { setLoading(false); return; }
         const c = data.client;
         setName(c.name || '');
         setOwnerName(c.ownerName || '');
@@ -130,13 +132,16 @@ export default function ClientConfigPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
     // Load GSC connection status
-    fetch('http://127.0.0.1:3337/api/gsc/status')
-      .then(r => r.json())
-      .then(data => {
-        setGscConnected(!!data.connected);
-        setGscPropertyUrl(data.propertyUrl || '');
-      })
-      .catch(() => {});
+    getMcUrl().then(url => {
+      fetch(`${url}/api/gsc/status`)
+        .then(r => r.json())
+        .then(data => {
+          setGscConnected(!!data.connected);
+          setGscPropertyUrl(data.propertyUrl || '');
+        })
+        .catch(() => {});
+    });
+    });
   }, []);
 
   // ─── Google Search Console OAuth ───────────────────────────────────────────
@@ -148,7 +153,7 @@ export default function ClientConfigPage() {
     setGscConnecting(true);
     setGscMsg(null);
     try {
-      const mcUrl = 'http://127.0.0.1:3337';
+      const mcUrl = await getMcUrl();
       const baseUrl = window.location.origin;
       const redirectUri = `${baseUrl}/api/gsc/callback`;
       const state = JSON.stringify({
@@ -200,7 +205,8 @@ export default function ClientConfigPage() {
 
   const disconnectGsc = async () => {
     try {
-      await fetch('http://127.0.0.1:3337/api/gsc/disconnect', { method: 'DELETE' });
+      const mcUrl = await getMcUrl();
+      await fetch(`${mcUrl}/api/gsc/disconnect`, { method: 'DELETE' });
       setGscConnected(false);
       setGscPropertyUrl('');
       setGscClientId('');
@@ -227,7 +233,8 @@ export default function ClientConfigPage() {
           competitors,
         }
       };
-      const res = await fetch('http://127.0.0.1:3337/api/client-config', {
+      const mcUrl = await getMcUrl();
+      const res = await fetch(`${mcUrl}/api/client-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
