@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Clock, CheckCircle, AlertCircle, Play, Square, Zap, Instagram, RefreshCw, Shield, ShieldCheck, Loader2 } from 'lucide-react';
 import { getMcUrl } from '@/lib/mc-url';
+import { supabase } from '@/lib/supabase';
 
 const ACCENT = '#ec4899';
 
@@ -83,8 +84,10 @@ export default function UGCPase() {
         return;
       }
       // Fallback: fetch from Supabase directly
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqZGVnbWhzdnd5bXh6ZXp3d25hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjAxMTgzMSwiZXhwIjoyMDkxNTg3ODMxfQ.67ojMu3XLJ_IR354Kaw9Jk1r_CH6yf3zR-YDt6ZdUv4';
-      const supabaseRes = await fetch(`https://ujdegmhsvwymxzezwwna.supabase.co/rest/v1/accounts?account_system=eq.ig_ugc&select=id,name,adspower_id,warmup_days_completed,warmup_completed,status&order=created_at.desc`, {
+      const supabaseRes = await fetch(`https://ujdegmhsvwymxzezwwna.supabase.co/rest/v1/accounts?account_system=eq.ig_ugc&user_id=eq.${user.id}&select=id,name,adspower_id,warmup_days_completed,warmup_completed,status&order=created_at.desc`, {
         headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey },
       });
       if (supabaseRes.ok) {

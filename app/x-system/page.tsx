@@ -319,9 +319,11 @@ export default function XSystemPage() {
   // Load scheduled posts
   const loadPosts = useCallback(async () => {
     setLoadingPosts(true);
+    const { data: { user } } = await supabase.auth.getUser();
     const { data } = await supabase
       .from('scheduled_posts')
       .select('*')
+      .eq('user_id', user?.id)
       .eq('platform', 'x')
       .order('scheduled_for', { ascending: true });
     if (data) {
@@ -334,28 +336,35 @@ export default function XSystemPage() {
   useEffect(() => {
     loadPosts();
     const today = new Date().toISOString().split('T')[0];
-    supabase
-      .from('scheduled_posts')
-      .select('id', { count: 'exact', head: true })
-      .eq('platform', 'x')
-      .eq('status', 'published')
-      .gte('published_at', today)
-      .then(({ count }) => setStats(s => ({ ...s, posts_today: count || 0 })));
-    supabase
-      .from('x_connections')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'connected')
-      .then(({ count }) => setStats(s => ({ ...s, accounts_count: count || 0 })));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('scheduled_posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('platform', 'x')
+        .eq('status', 'published')
+        .gte('published_at', today)
+        .then(({ count }) => setStats(s => ({ ...s, posts_today: count || 0 })));
+      supabase
+        .from('x_connections')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'connected')
+        .then(({ count }) => setStats(s => ({ ...s, accounts_count: count || 0 })));
+    });
   }, [loadPosts, supabase]);
 
   const handlePostNow = async () => {
     if (!postText.trim()) return;
     setIsPostingNow(true);
+    const { data: { user } } = await supabase.auth.getUser();
     await supabase.from('scheduled_posts').insert({
       platform: 'x',
       post_text: postText.trim(),
       scheduled_for: new Date().toISOString(),
       status: 'scheduled',
+      user_id: user?.id,
     });
     setPostText('');
     loadPosts();
@@ -368,11 +377,13 @@ export default function XSystemPage() {
     if (!schedulingFor) { setScheduleMsg({ type: 'error', text: 'Pick a date and time' }); return; }
     setIsScheduling(true);
     setScheduleMsg(null);
+    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from('scheduled_posts').insert({
       platform: 'x',
       post_text: postText.trim(),
       scheduled_for: schedulingFor,
       status: 'scheduled',
+      user_id: user?.id,
     });
     if (error) setScheduleMsg({ type: 'error', text: error.message });
     else { setScheduleMsg({ type: 'ok', text: 'Post scheduled!' }); setPostText(''); setSchedulingFor(''); loadPosts(); }
@@ -386,10 +397,11 @@ export default function XSystemPage() {
     if (newVal) {
       const offsets: Record<AutoDaypart, { hour: number; min: number }> = { morning: { hour: 7, min: 0 }, midday: { hour: 12, min: 0 }, evening: { hour: 17, min: 0 } };
       const { hour, min } = offsets[key];
+      const { data: { user } } = await supabase.auth.getUser();
       let next = new Date();
       next.setHours(hour + 6, min, 0, 0);
       if (next <= new Date()) next.setDate(next.getDate() + 1);
-      await supabase.from('scheduled_posts').insert({ platform: 'x', post_text: '', scheduled_for: next.toISOString(), status: 'scheduled' });
+      await supabase.from('scheduled_posts').insert({ platform: 'x', post_text: '', scheduled_for: next.toISOString(), status: 'scheduled', user_id: user?.id });
     }
   };
 
