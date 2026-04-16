@@ -152,6 +152,7 @@ export default function MonitorPage() {
 
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [businessName, setBusinessName] = useState('');
+  const [configComplete, setConfigComplete] = useState(false);
 
   // ─── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -166,6 +167,12 @@ export default function MonitorPage() {
         const ccRes = await fetch(`${url}/api/client-config`);
         const ccData = await ccRes.json();
         if (ccData.client?.name) setBusinessName(ccData.client.name);
+      } catch (_) {}
+      // Check if client config is complete
+      try {
+        const statusRes = await fetch(`${url}/api/client-config/status`);
+        const statusData = await statusRes.json();
+        setConfigComplete(!!statusData.complete);
       } catch (_) {}
       // Load keywords immediately after getting URL
       try {
@@ -412,6 +419,26 @@ export default function MonitorPage() {
     { key: 'reviews',      label: 'Reviews',        icon: <Star size={14} /> },
     { key: 'competitors', label: 'Competitors',    icon: <Users size={14} /> },
   ] as const;
+
+  if (!configComplete) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', maxWidth: 440 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Setup required</h2>
+          <p style={{ color: '#6b7280', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
+            Complete your Client Config before using SEO Monitor. This helps us know what brand and keywords to track.
+          </p>
+          <button
+            onClick={() => window.location.href = '/client-config'}
+            style={{ background: '#06b6d4', border: 'none', borderRadius: 8, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Go to Client Config →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui, sans-serif' }}>
