@@ -155,13 +155,16 @@ export default function ClientConfigPage() {
     try {
       const mcUrl = await getMcUrl();
       const baseUrl = window.location.origin;
-      const redirectUri = `${baseUrl}/api/gsc/callback`;
-      // Pass state as URL-encoded JSON (safe for URL transmission)
+      // Redirect to MC server's callback endpoint (which can reach Google's OAuth servers)
+      const redirectUri = `${mcUrl}/api/gsc/callback`;
+      // Pass state as URL-encoded JSON
       const state = JSON.stringify({
         clientId: gscClientId.trim(),
         clientSecret: gscClientSecret.trim(),
         propertyUrl: gscPropertyUrl.trim(),
         mcUrl,
+        redirectUri,
+        redirectBase: `${baseUrl}/client-config`,
       });
       const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
         `client_id=${encodeURIComponent(gscClientId.trim())}` +
