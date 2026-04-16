@@ -383,24 +383,44 @@ export default function ClientConfigPage() {
                 Connect Google Search Console to see <strong style={{ color: 'var(--text)' }}>real keyword rankings, clicks, and impressions</strong> directly from Google — no extra tools needed, completely free.
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 1 — Get your Google Cloud credentials</div>
-                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 10 }}>
-                  1. Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>console.cloud.google.com → APIs & Services → Credentials</a><br />
-                  2. Create an <strong>OAuth Client ID</strong> (Web application type)<br />
-                  3. Add this as an <strong>Authorized Redirect URI</strong>:<br />
-                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontSize: 11, color: '#10b981', display: 'block', marginTop: 4 }}>{typeof window !== 'undefined' ? window.location.origin : ''}/api/gsc/callback</code>
-                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 1 — Create a Google Cloud project (one-time)</div>
                 <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
-                  4. Copy your <strong>Client ID</strong> and <strong>Client Secret</strong> below
+                  1. Open <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>console.cloud.google.com</a> and sign in with your Google account<br />
+                  2. At the top, click <strong>"Select a project"</strong> → <strong>"New Project"</strong><br />
+                  3. Name it anything (e.g. "My Site SEO") and click <strong>"Create"</strong><br />
+                  4. Make sure your new project is selected at the top
                 </div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 2 — Add your website in Search Console</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 2 — Enable Search Console API</div>
                 <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
-                  1. Go to <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>search.google.com/search-console</a><br />
-                  2. Add your website property (URL prefix, then paste your site URL)<br />
-                  3. Verify ownership (e.g. copy the HTML tag Google gives you)<br />
-                  4. Your Property URL looks like: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontSize: 11, color: '#10b981' }}>sc-domain:yourdomain.com</code>
+                  1. In the left sidebar, click <strong>"APIs & Services"</strong> → <strong>"Library"</strong><br />
+                  2. Search for <strong>"Google Search Console API"</strong><br />
+                  3. Click it → click <strong>"Enable"</strong>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 3 — Create OAuth credentials (this is what Google needs)</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                  1. Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>APIs & Services → Credentials</a><br />
+                  2. Click <strong>"+ Create Credentials"</strong> → <strong>"OAuth client ID"</strong><br />
+                  3. Application type: select <strong>"Web application"</strong><br />
+                  4. Name it anything (e.g. "Opernox SEO")<br />
+                  5. Under <strong>"Authorized redirect URIs"</strong> — click <strong>"+ Add URI"</strong> and paste this exact URL:<br />
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '3px 8px', borderRadius: 4, fontSize: 11, color: '#10b981', display: 'block', marginTop: 4, wordBreak: 'break-all' }}>{typeof window !== 'undefined' ? window.location.origin : ''}/api/gsc/callback</code>
+                  6. Click <strong>"Create"</strong><br />
+                  7. Google will show you a <strong>"Client ID"</strong> and <strong>"Client Secret"</strong> — copy both into the fields below
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 4 — Add your website to Google Search Console</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                  1. Open <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>search.google.com/search-console</a><br />
+                  2. Click <strong>"Add property"</strong> at the top left<br />
+                  3. Choose <strong>"Domain"</strong> type, type your domain (e.g. <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 5px', borderRadius: 4, fontSize: 11, color: '#10b981' }}>example.com</code>)<br />
+                  4. Google gives you a TXT record — go to where you bought your domain (e.g. GoDaddy, Namecheap) and add that TXT record<br />
+                  5. Come back and click <strong>"Verify"</strong><br />
+                  6. Done! Your Property URL will be: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontSize: 11, color: '#10b981' }}>sc-domain:yourdomain.com</code>
                 </div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
