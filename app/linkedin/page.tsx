@@ -46,9 +46,12 @@ export default function LinkedInPage() {
 
   const loadPosts = useCallback(async () => {
     setLoadingPosts(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoadingPosts(false); return; }
     const { data } = await supabase
       .from('scheduled_posts')
       .select('*')
+      .eq('user_id', user.id)
       .eq('platform', 'linkedin')
       .order('scheduled_for', { ascending: true });
     if (data) setPosts(data);
@@ -70,17 +73,21 @@ export default function LinkedInPage() {
 
   useEffect(() => {
     // Load LinkedIn account from accounts table
-    supabase
-      .from('accounts')
-      .select('id, name, adspower_id, status, created_at')
-      .eq('account_system', 'linkedin')
-      .eq('status', 'active')
-      .limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setConnection({ id: data[0].id, screen_name: data[0].name || 'LinkedIn', status: 'connected', connected_at: data[0].created_at });
-        }
-      });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('accounts')
+        .select('id, name, adspower_id, status, created_at')
+        .eq('user_id', user.id)
+        .eq('account_system', 'linkedin')
+        .eq('status', 'active')
+        .limit(1)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setConnection({ id: data[0].id, screen_name: data[0].name || 'LinkedIn', status: 'connected', connected_at: data[0].created_at });
+          }
+        });
+    });
   }, []);
 
   const handleAutoPostToggleLinkedIn = async () => {
@@ -100,11 +107,14 @@ export default function LinkedInPage() {
   const handlePostNow = async () => {
     if (!postText.trim()) return;
     setIsPostingNow(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setIsPostingNow(false); return; }
     const { error } = await supabase.from('scheduled_posts').insert({
       platform: 'linkedin',
       post_text: postText.trim(),
       scheduled_for: new Date().toISOString(),
       status: 'scheduled',
+      user_id: user.id,
     });
     if (error) {
       setScheduleMsg({ type: 'error', text: error.message });
@@ -125,11 +135,13 @@ export default function LinkedInPage() {
     }
     setIsScheduling(true);
     setScheduleMsg(null);
+    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from('scheduled_posts').insert({
       platform: 'linkedin',
       post_text: postText.trim(),
       scheduled_for: schedulingFor,
       status: 'scheduled',
+      user_id: user?.id,
     });
     if (error) {
       setScheduleMsg({ type: 'error', text: error.message });

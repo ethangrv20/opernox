@@ -39,9 +39,11 @@ export default function TikTokPage() {
 
   const loadPosts = useCallback(async () => {
     setLoadingPosts(true);
+    const { data: { user } } = await supabase.auth.getUser();
     const { data } = await supabase
       .from('scheduled_posts')
       .select('*')
+      .eq('user_id', user?.id)
       .eq('platform', 'tiktok')
       .order('scheduled_for', { ascending: true });
     if (data) setPosts(data);
@@ -54,14 +56,18 @@ export default function TikTokPage() {
 
   useEffect(() => {
     // Check if TikTok account is connected
-    supabase
-      .from('accounts')
-      .select('id')
-      .eq('account_system', 'tiktok_ugc')
-      .eq('status', 'active')
-      .limit(1)
-      .then(({ data }) => setTiktokConnected(!!(data && data.length > 0)));
-    loadPosts();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('account_system', 'tiktok_ugc')
+        .eq('status', 'active')
+        .limit(1)
+        .then(({ data }) => setTiktokConnected(!!(data && data.length > 0)));
+      loadPosts();
+    });
   }, []);
 
   useEffect(() => {
@@ -132,11 +138,13 @@ export default function TikTokPage() {
       // 2. Create scheduled post — embed video filename so job agent can find it (no metadata column)
       const videoFileName = (videoPath.split(/[\\/]/).pop() || '');
       const postTextWithVideo = caption.trim() + '[TTVIDEO:]' + videoFileName + '[TTVIDEO_END]';
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from('scheduled_posts').insert({
         platform: 'tiktok',
         post_text: postTextWithVideo,
         scheduled_for: new Date().toISOString(),
         status: 'scheduled',
+        user_id: user?.id,
       });
 
       if (error) throw new Error(error.message);
