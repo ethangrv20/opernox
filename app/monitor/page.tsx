@@ -158,7 +158,6 @@ export default function MonitorPage() {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = '/login'; return; }
       setUser(user);
       const url = await getMcUrl();
       setMcUrl(url);
