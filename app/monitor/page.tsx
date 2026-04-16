@@ -566,8 +566,16 @@ export default function MonitorPage() {
               </div>
             )}
 
-            {/* GSC not connected */}
-            {(!gscData?.connected || (gscData.connected && !gscData.keywords?.length)) && !gscLoading && (
+            {/* GSC connected but no keywords yet (property still processing) */}
+            {gscData?.connected && !gscData.keywords?.length && !gscLoading && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Google Search Console is connected but no keyword data yet</div>
+                <div style={{ fontSize: 12, color: '#4b5563' }}>Google usually takes 1-3 days to process a new property. Check back soon.</div>
+              </div>
+            )}
+
+            {/* GSC not connected at all */}
+            {!gscData?.connected && !gscLoading && (
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Connect Google Search Console to see real keyword data</div>
                 <div style={{ fontSize: 12, color: '#4b5563' }}>Set up in <a href="/client-config" style={{ color: '#3b82f6' }}>Client Config → Google Search Console</a></div>
@@ -710,6 +718,11 @@ export default function MonitorPage() {
               <button onClick={loadMentions} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '9px 14px', color: '#fff', cursor: 'pointer' }}>
                 <RefreshCw size={13} />
               </button>
+              {mentions.length > 0 && (
+                <button onClick={async () => { if (!confirm('Clear all mentions?')) return; await fetch(`${baseUrl}/api/monitor/mentions`, {method:'DELETE'}); loadMentions(); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>
+                  🗑️ Clear All
+                </button>
+              )}
             </div>
 
             {mentionLoading ? (
@@ -761,6 +774,11 @@ export default function MonitorPage() {
               <button onClick={loadReviews} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '9px 14px', color: '#fff', cursor: 'pointer' }}>
                 <RefreshCw size={13} />
               </button>
+              {reviews.length > 0 && (
+                <button onClick={async () => { if (!confirm('Clear all reviews?')) return; await fetch(`${baseUrl}/api/monitor/reviews`, {method:'DELETE'}); loadReviews(); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>
+                  🗑️ Clear All
+                </button>
+              )}
             </div>
             {reviewLoading ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}><Loader2 size={24} style={{ animation: 'spin' }} /></div>
