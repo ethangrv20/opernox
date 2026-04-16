@@ -1,7 +1,7 @@
 'use client';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Video, Twitter, Linkedin, Music, Send, ArrowRight, Users } from 'lucide-react';
+import { Video, Twitter, Linkedin, Music, Send, ArrowRight, Users, Search } from 'lucide-react';
 
 const SYSTEMS = [
   {
@@ -51,6 +51,14 @@ const SYSTEMS = [
     desc: 'Mass DM + AI reply engine',
     accent: '#ec4899',
     route: '/outreach',
+  },
+  {
+    href: '/monitor',
+    icon: <Search size={18} />,
+    label: 'SEO Monitor',
+    desc: 'Keyword rankings, brand mentions, reviews & competitors',
+    accent: '#f59e0b',
+    route: '/monitor',
   },
 ];
 
