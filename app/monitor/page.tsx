@@ -134,6 +134,7 @@ export default function MonitorPage() {
   const [addingComp, setAddingComp] = useState(false);
 
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const [businessName, setBusinessName] = useState('');
 
   // ─── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -143,6 +144,12 @@ export default function MonitorPage() {
       setUser(user);
       const url = await getMcUrl();
       setMcUrl(url);
+      // Load client-config for business name (used for mentions/reviews scraping)
+      try {
+        const ccRes = await fetch(`${url}/api/client-config`);
+        const ccData = await ccRes.json();
+        if (ccData.client?.name) setBusinessName(ccData.client.name);
+      } catch (_) {}
       // Load keywords immediately after getting URL
       try {
         setLoading(true);
@@ -261,7 +268,7 @@ export default function MonitorPage() {
       const url = await getMcUrl();
       const res = await fetch(`${url}/api/monitor/scrape/reviews`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'google_places', business_name: 'Opernox' })
+        body: JSON.stringify({ platform: 'google_places', business_name: businessName || 'Opernox' })
       });
       const data = await res.json();
       if (data.success) { setMsg({ type: 'ok', text: data.message }); loadReviews(); }
@@ -278,7 +285,7 @@ export default function MonitorPage() {
       const url = await getMcUrl();
       const res = await fetch(`${url}/api/monitor/scrape/mentions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: keywords[0]?.keyword || '' })
+        body: JSON.stringify({ keyword: businessName || keywords[0]?.keyword || '' })
       });
       const data = await res.json();
       if (data.success) { setMsg({ type: 'ok', text: data.message }); loadMentions(); }
@@ -397,6 +404,11 @@ export default function MonitorPage() {
             <p style={{ color: '#6b7280', fontSize: 13, margin: '4px 0 0' }}>
               Track keyword rankings, brand mentions, reviews & competitors
             </p>
+            {businessName && (
+              <p style={{ color: '#10b981', fontSize: 12, margin: '4px 0 0' }}>
+                Monitoring brand: <strong>{businessName}</strong>
+              </p>
+            )}
           </div>
           <button
             onClick={() => tab === 'keywords' ? loadKeywords() : tab === 'rankings' ? loadRankings() : tab === 'mentions' ? loadMentions() : tab === 'reviews' ? loadReviews() : loadCompetitors()}
