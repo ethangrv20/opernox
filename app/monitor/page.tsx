@@ -155,6 +155,38 @@ export default function MonitorPage() {
     })();
   }, []);
 
+  // ─── Scrape Rankings ──────────────────────────────────────────────────────
+  const [scrapeLoading, setScrapeLoading] = useState<string | null>(null);
+
+  const checkRankings = async (kw: MonitorKeyword) => {
+    if (scrapeLoading) return;
+    setScrapeLoading(kw.id);
+    setMsg(null);
+    try {
+      const baseUrl = await getMcUrl();
+      const res = await fetch(`${baseUrl}/api/monitor/scrape/ranks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword_id: kw.id, keyword: kw.keyword, target_url: kw.target_url })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMsg({ type: 'ok', text: data.message || 'Rankings updated!' });
+        if (tab === 'rankings') loadRankings();
+        else {
+          // Also refresh keywords so latest rank badge updates
+          loadKeywords();
+        }
+      } else {
+        setMsg({ type: 'error', text: data.error || 'Failed to check rankings' });
+      }
+    } catch (e: any) {
+      setMsg({ type: 'error', text: e.message });
+    } finally {
+      setScrapeLoading(null);
+    }
+  };
+
   // ─── Load Keywords (for refresh button) ───────────────────────────────────
   const loadKeywords = async () => {
     if (!user) return;
@@ -418,6 +450,28 @@ export default function MonitorPage() {
                     ) : (
                       <span style={{ color: '#4b5563', fontSize: 12 }}>No ranking data</span>
                     )}
+                    <button
+                      onClick={() => checkRankings(kw)}
+                      disabled={scrapeLoading === kw.id}
+                      style={{
+                        background: scrapeLoading === kw.id ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.1)',
+                        border: '1px solid rgba(59,130,246,0.25)',
+                        borderRadius: 8,
+                        padding: '7px 12px',
+                        color: scrapeLoading === kw.id ? '#93c5fd' : '#3b82f6',
+                        cursor: scrapeLoading === kw.id ? 'not-allowed' : 'pointer',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        minWidth: 90,
+                        justifyContent: 'center',
+                      }}
+                      title="Check Google rankings for this keyword"
+                    >
+                      {scrapeLoading === kw.id ? <Loader2 size={12} style={{ animation: 'spin' }} /> : <Search size={12} />}
+                      {scrapeLoading === kw.id ? 'Checking…' : '🔍 Check'}
+                    </button>
                     <button onClick={() => deleteKeyword(kw.id)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: 8, color: '#ef4444', cursor: 'pointer' }}>
                       <Trash2 size={13} />
                     </button>
