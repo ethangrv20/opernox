@@ -108,6 +108,23 @@ export default function MonitorPage() {
   const [tab, setTab] = useState<'keywords' | 'rankings' | 'mentions' | 'reviews' | 'competitors'>('keywords');
   const [loading, setLoading] = useState(true);
 
+  // GSC (Google Search Console)
+  const [gscData, setGscData] = useState<{ connected: boolean; propertyUrl?: string; keywords?: any[] } | null>(null);
+  const [gscLoading, setGscLoading] = useState(false);
+
+  const loadGscData = useCallback(async () => {
+    if (!user) return;
+    setGscLoading(true);
+    try {
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/gsc/data`);
+      const data = await res.json();
+      setGscData(data);
+    } catch (e: any) {
+      setGscData({ connected: false });
+    } finally { setGscLoading(false); }
+  }, [user]);
+
   // Keywords
   const [keywords, setKeywords] = useState<MonitorKeyword[]>([]);
   const [newKw, setNewKw] = useState('');
@@ -160,6 +177,8 @@ export default function MonitorPage() {
       } catch (e: any) {
         setMsg({ type: 'error', text: e.message });
       } finally { setLoading(false); }
+      // Load GSC data in background (non-blocking)
+      loadGscData();
     })();
   }, []);
 
@@ -483,6 +502,50 @@ export default function MonitorPage() {
                 </button>
               </div>
             </div>
+
+            {/* Google Search Console data — shows real keyword performance from Google */}
+            {gscData?.connected && gscData.keywords && gscData.keywords.length > 0 && (
+              <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#10b981' }}>Google Search Console</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{gscData.propertyUrl} · Last 28 days</div>
+                  </div>
+                  <button onClick={loadGscData} disabled={gscLoading}
+                    style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, padding: '5px 10px', color: '#10b981', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <RefreshCw size={11} style={gscLoading ? { animation: 'spin' } : {}} /> Refresh
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {gscData.keywords.slice(0, 20).map((kw: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: '#e5e7eb', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kw.keys?.[0]}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                          <span style={{ color: '#10b981', fontWeight: 600 }}>{Number(kw.clicks).toLocaleString()}</span> clicks ·
+                          <span style={{ color: '#f59e0b', fontWeight: 600 }}>{Number(kw.impressions).toLocaleString()}</span> impressions ·
+                          Avg position <span style={{ color: kw.position <= 3 ? '#10b981' : kw.position <= 10 ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{Number(kw.position).toFixed(1)}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#4b5563', minWidth: 40, textAlign: 'right' }}>
+                        CTR {kw.ctr ? `${(kw.ctr * 100).toFixed(1)}%` : '–'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {gscData.keywords.length > 20 && (
+                  <div style={{ fontSize: 12, color: '#4b5563', textAlign: 'center', marginTop: 10 }}>Showing top 20 of {gscData.keywords.length} keywords</div>
+                )}
+              </div>
+            )}
+
+            {/* GSC not connected */}
+            {(!gscData?.connected || (gscData.connected && !gscData.keywords?.length)) && !gscLoading && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Connect Google Search Console to see real keyword data</div>
+                <div style={{ fontSize: 12, color: '#4b5563' }}>Set up in <a href="/client-config" style={{ color: '#3b82f6' }}>Client Config → Google Search Console</a></div>
+              </div>
+            )}
 
             {/* Keywords list */}
             {loading ? (
