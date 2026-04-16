@@ -142,32 +142,41 @@ export default function MonitorPage() {
       setUser(user);
       const url = await getMcUrl();
       setMcUrl(url);
+      // Load keywords immediately after getting URL
+      try {
+        setLoading(true);
+        const res = await fetch(`${url}/api/monitor/keywords`);
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const data = await res.json();
+        setKeywords(Array.isArray(data) ? data : (data.value || []));
+      } catch (e: any) {
+        setMsg({ type: 'error', text: e.message });
+      } finally { setLoading(false); }
     })();
   }, []);
 
-  // ─── Load Keywords ────────────────────────────────────────────────────────
-  const loadKeywords = useCallback(async () => {
+  // ─── Load Keywords (for refresh button) ───────────────────────────────────
+  const loadKeywords = async () => {
     if (!user) return;
-    setLoading(true);
+    setLoading(true); setMsg(null);
     try {
-      const url = `${mcUrl}/api/monitor/keywords`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Server returned ${res.status} — ${res.statusText}`);
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/keywords`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const data = await res.json();
       setKeywords(Array.isArray(data) ? data : (data.value || []));
     } catch (e: any) {
-      setMsg({ type: 'error', text: `Keywords: ${e.message}` });
+      setMsg({ type: 'error', text: e.message });
     } finally { setLoading(false); }
-  }, [user, mcUrl]);
-
-  useEffect(() => { if (user) loadKeywords(); }, [user, loadKeywords]);
+  };
 
   // ─── Add Keyword ───────────────────────────────────────────────────────────
   const addKeyword = async () => {
     if (!newKw.trim()) return;
     setAddingKw(true); setMsg(null);
     try {
-      const res = await fetch(`${mcUrl}/api/monitor/keywords`, {
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/keywords`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyword: newKw.trim(), target_url: newKwUrl.trim() || null }),
@@ -184,7 +193,8 @@ export default function MonitorPage() {
   // ─── Delete Keyword ───────────────────────────────────────────────────────
   const deleteKeyword = async (id: string) => {
     try {
-      const res = await fetch(`${mcUrl}/api/monitor/keywords/${id}/delete`, { method: 'DELETE' });
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/keywords/${id}/delete`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
       setKeywords(prev => prev.filter(k => k.id !== id));
     } catch (e: any) {
@@ -197,57 +207,62 @@ export default function MonitorPage() {
     if (!user) return;
     setRankLoading(true);
     try {
+      const baseUrl = await getMcUrl();
       const p = new URLSearchParams({ limit: '200' });
       if (rankFilter) p.set('keyword', rankFilter);
-      const res = await fetch(`${mcUrl}/api/monitor/rankings?${p}`);
+      const res = await fetch(`${baseUrl}/api/monitor/rankings?${p}`);
       const data = await res.json();
       setRankings(Array.isArray(data) ? data : (data.value || []));
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
     finally { setRankLoading(false); }
-  }, [user, mcUrl, rankFilter]);
+  }, [user, rankFilter]);
 
   // ─── Load Mentions ───────────────────────────────────────────────────────
   const loadMentions = useCallback(async () => {
     if (!user) return;
     setMentionLoading(true);
     try {
+      const baseUrl = await getMcUrl();
       const p = new URLSearchParams({ limit: '100' });
       if (mentionFilter) p.set('source', mentionFilter);
-      const res = await fetch(`${mcUrl}/api/monitor/mentions?${p}`);
+      const res = await fetch(`${baseUrl}/api/monitor/mentions?${p}`);
       const data = await res.json();
       setMentions(Array.isArray(data) ? data : (data.value || []));
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
     finally { setMentionLoading(false); }
-  }, [user, mcUrl, mentionFilter]);
+  }, [user, mentionFilter]);
 
   // ─── Load Reviews ─────────────────────────────────────────────────────────
   const loadReviews = useCallback(async () => {
     if (!user) return;
     setReviewLoading(true);
     try {
-      const res = await fetch(`${mcUrl}/api/monitor/reviews`);
+      const baseUrl = await getMcUrl();
+      const res = await fetch(`${baseUrl}/api/monitor/reviews`);
       const data = await res.json();
       setReviews(Array.isArray(data) ? data : (data.value || []));
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
     finally { setReviewLoading(false); }
-  }, [user, mcUrl]);
+  }, [user]);
 
   // ─── Load Competitors ────────────────────────────────────────────────────
   const loadCompetitors = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await fetch(`${mcUrl}/api/monitor/competitors`);
+      const baseUrl = await getMcUrl();
+      const res = await fetch(`${baseUrl}/api/monitor/competitors`);
       const data = await res.json();
       setCompetitors(Array.isArray(data) ? data : (data.value || []));
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
-  }, [user, mcUrl]);
+  }, [user]);
 
   // ─── Add Competitor ───────────────────────────────────────────────────────
   const addCompetitor = async () => {
     if (!newComp.name.trim()) return;
     setAddingComp(true);
     try {
-      const res = await fetch(`${mcUrl}/api/monitor/competitors`, {
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/competitors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newComp.name.trim(), domain: newComp.domain.trim() || null }),
