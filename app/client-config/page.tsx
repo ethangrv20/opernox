@@ -12,6 +12,7 @@ const SECTIONS = [
   { id: 'results', label: 'Client Results' },
   { id: 'brand', label: 'Brand Voice' },
   { id: 'market', label: 'Market Context' },
+  { id: 'gsc', label: 'Google Search Console' },
 ];
 
 interface Offering { name: string; price: string; description: string; }
@@ -86,7 +87,25 @@ export default function ClientConfigPage() {
   const [geography, setGeography] = useState('');
   const [competitors, setCompetitors] = useState('');
 
+  // Google Search Console
+  const [gscConnected, setGscConnected] = useState(false);
+  const [gscPropertyUrl, setGscPropertyUrl] = useState('');
+  const [gscClientId, setGscClientId] = useState('');
+  const [gscClientSecret, setGscClientSecret] = useState('');
+  const [gscConnecting, setGscConnecting] = useState(false);
+  const [gscMsg, setGscMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gscStatus = params.get('gsc');
+    if (gscStatus === 'connected') {
+      setMsg({ type: 'ok', text: 'Google Search Console connected successfully!' });
+      window.history.replaceState({}, '', '/client-config');
+    } else if (gscStatus === 'error') {
+      const reason = params.get('reason') || 'Connection failed';
+      setMsg({ type: 'error', text: `Google connection failed: ${decodeURIComponent(reason)}` });
+      window.history.replaceState({}, '', '/client-config');
+    }
     fetch('http://127.0.0.1:3337/api/client-config')
       .then(r => r.json())
       .then(data => {
@@ -110,7 +129,87 @@ export default function ClientConfigPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    // Load GSC connection status
+    fetch('http://127.0.0.1:3337/api/gsc/status')
+      .then(r => r.json())
+      .then(data => {
+        setGscConnected(!!data.connected);
+        setGscPropertyUrl(data.propertyUrl || '');
+      })
+      .catch(() => {});
   }, []);
+
+  // ─── Google Search Console OAuth ───────────────────────────────────────────
+  const startGscOAuth = async () => {
+    if (!gscClientId.trim() || !gscClientSecret.trim() || !gscPropertyUrl.trim()) {
+      setGscMsg({ type: 'error', text: 'Fill in all three fields above first' });
+      return;
+    }
+    setGscConnecting(true);
+    setGscMsg(null);
+    try {
+      const mcUrl = 'http://127.0.0.1:3337';
+      const baseUrl = window.location.origin;
+      const redirectUri = `${baseUrl}/api/gsc/callback`;
+      const state = JSON.stringify({
+        clientId: gscClientId.trim(),
+        clientSecret: gscClientSecret.trim(),
+        propertyUrl: gscPropertyUrl.trim(),
+        mcUrl,
+      });
+      const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
+        `client_id=${encodeURIComponent(gscClientId.trim())}` +
+        `&response_type=code` +
+        `&access_type=offline` +
+        `&prompt=consent` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&scope=${encodeURIComponent('https://www.googleapis.com/auth/webmasters.readonly')}` +
+        `&state=${encodeURIComponent(state)}`;
+      // Open OAuth popup
+      const popup = window.open(authUrl, 'gsc_oauth', 'width=600,height=700,scrollbars=yes');
+      if (!popup) {
+        setGscMsg({ type: 'error', text: 'Popup was blocked — allow popups for this site and try again' });
+        setGscConnecting(false);
+        return;
+      }
+      // Poll for the callback result via storage event (same origin)
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          // Re-check GSC status after popup closes
+          fetch(`${mcUrl}/api/gsc/status`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.connected) {
+                setGscConnected(true);
+                setGscPropertyUrl(data.propertyUrl || gscPropertyUrl);
+                setGscMsg({ type: 'ok', text: 'Google Search Console connected!' });
+              } else {
+                setGscMsg({ type: 'error', text: 'Connection not completed — make sure you clicked "Allow" in the popup' });
+              }
+              setGscConnecting(false);
+            })
+            .catch(() => { setGscConnecting(false); });
+        }
+      }, 500);
+    } catch (e: any) {
+      setGscMsg({ type: 'error', text: e.message });
+      setGscConnecting(false);
+    }
+  };
+
+  const disconnectGsc = async () => {
+    try {
+      await fetch('http://127.0.0.1:3337/api/gsc/disconnect', { method: 'DELETE' });
+      setGscConnected(false);
+      setGscPropertyUrl('');
+      setGscClientId('');
+      setGscClientSecret('');
+      setGscMsg({ type: 'ok', text: 'Google Search Console disconnected' });
+    } catch (e: any) {
+      setGscMsg({ type: 'error', text: e.message });
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -257,6 +356,85 @@ export default function ClientConfigPage() {
           <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>Where does this business operate? What makes them different?</div>
           <Field label="Target Geography" value={geography} onChange={setGeography} placeholder="e.g. US and Canada, primarily suburban markets. English-speaking only." type="textarea" rows={2} />
           <Field label="Competitors or Alternatives" value={competitors} onChange={setCompetitors} placeholder="How do potential clients solve this problem today? What are they doing instead of hiring you? What makes you different?" type="textarea" rows={3} />
+        </div>
+      )
+    },
+    {
+      id: 'gsc', label: 'Google Search Console', icon: '08',
+      content: (
+        <div>
+          {gscConnected ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '12px 16px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8 }}>
+                <CheckCircle size={18} style={{ color: '#10b981', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#10b981' }}>Connected to Google Search Console</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{gscPropertyUrl}</div>
+                </div>
+                <button onClick={disconnectGsc} style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(244,63,94,0.3)', background: 'rgba(244,63,94,0.05)', color: '#f43f5e', cursor: 'pointer', fontSize: 12 }}>Disconnect</button>
+              </div>
+              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                Your keyword performance data is automatically fetched daily and displayed in the <strong style={{ color: '#e5e7eb' }}>Monitor → Keywords</strong> page.
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 14, fontWeight: 600, lineHeight: 1.6 }}>
+                Connect Google Search Console to see <strong style={{ color: 'var(--text)' }}>real keyword rankings, clicks, and impressions</strong> directly from Google — no extra tools needed, completely free.
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 1 — Get your Google Cloud credentials</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 10 }}>
+                  1. Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>console.cloud.google.com → APIs & Services → Credentials</a><br />
+                  2. Create an <strong>OAuth Client ID</strong> (Web application type)<br />
+                  3. Add this as an <strong>Authorized Redirect URI</strong>:<br />
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontSize: 11, color: '#10b981', display: 'block', marginTop: 4 }}>{typeof window !== 'undefined' ? window.location.origin : ''}/api/gsc/callback</code>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                  4. Copy your <strong>Client ID</strong> and <strong>Client Secret</strong> below
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 2 — Add your website in Search Console</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                  1. Go to <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>search.google.com/search-console</a><br />
+                  2. Add your website property (URL prefix, then paste your site URL)<br />
+                  3. Verify ownership (e.g. copy the HTML tag Google gives you)<br />
+                  4. Your Property URL looks like: <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4, fontSize: 11, color: '#10b981' }}>sc-domain:yourdomain.com</code>
+                </div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 16, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 3 — Connect in Opernox</div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>Client ID</label>
+                  <input value={gscClientId} onChange={e => setGscClientId(e.target.value)} placeholder="your-client-id.apps.googleusercontent.com"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: 12, color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>Client Secret</label>
+                  <input value={gscClientSecret} onChange={e => setGscClientSecret(e.target.value)} placeholder="GOCSPX-..."
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: 12, color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4, fontWeight: 600 }}>Property URL <span style={{ fontWeight: 400, color: 'var(--text-4)' }}>(e.g. sc-domain:yourdomain.com)</span></label>
+                  <input value={gscPropertyUrl} onChange={e => setGscPropertyUrl(e.target.value)} placeholder="sc-domain:yourdomain.com"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-2)', background: 'var(--surface-2)', fontSize: 12, color: 'var(--text)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              {gscMsg && (
+                <div style={{ padding: '9px 12px', borderRadius: 6, marginBottom: 10, fontSize: 12, fontWeight: 600, background: gscMsg.type === 'ok' ? 'rgba(16,185,129,0.08)' : 'rgba(244,63,94,0.08)', border: `1px solid ${gscMsg.type === 'ok' ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'}`, color: gscMsg.type === 'ok' ? '#10b981' : '#f43f5e' }}>
+                  {gscMsg.text}
+                </div>
+              )}
+              <button onClick={startGscOAuth} disabled={gscConnecting}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 8, background: gscConnecting ? 'rgba(6,182,212,0.3)' : '#06b6d1', border: 'none', cursor: gscConnecting ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'inherit' }}>
+                {gscConnecting ? 'Opening Google consent screen...' : 'Connect Google Search Console →'}
+              </button>
+              <div style={{ fontSize: 11, color: '#4b5563', textAlign: 'center', marginTop: 8 }}>
+                You'll see a Google popup — just click "Allow" and it auto-connects
+              </div>
+            </div>
+          )}
         </div>
       )
     },
