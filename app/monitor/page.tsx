@@ -152,7 +152,7 @@ export default function MonitorPage() {
 
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [businessName, setBusinessName] = useState('');
-  const [configComplete, setConfigComplete] = useState(false);
+  const [configComplete, setConfigComplete] = useState<boolean | null>(null);
 
   // ─── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -418,6 +418,18 @@ export default function MonitorPage() {
     { key: 'reviews',      label: 'Reviews',        icon: <Star size={14} /> },
     { key: 'competitors', label: 'Competitors',    icon: <Users size={14} /> },
   ] as const;
+
+  // Show loading spinner while checking config status
+  if (configComplete === null) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+          <p style={{ color: '#6b7280', fontSize: 14 }}>Loading monitor...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!configComplete) {
     return (
