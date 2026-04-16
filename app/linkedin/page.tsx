@@ -156,7 +156,9 @@ export default function LinkedInPage() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('scheduled_posts').delete().eq('id', id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('scheduled_posts').delete().eq('id', id).eq('user_id', user.id);
     loadPosts();
   };
 
