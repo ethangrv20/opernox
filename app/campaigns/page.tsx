@@ -210,13 +210,17 @@ export default function CampaignsPage() {
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
   const toggleCampaign = async (c: Campaign) => {
-    await supabase.from('campaigns').update({ active: !c.active }).eq('id', c.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('campaigns').update({ active: !c.active }).eq('id', c.id).eq('user_id', user.id);
     fetchCampaigns();
   };
 
   const deleteCampaign = async (id: string) => {
     if (!confirm('Delete this campaign and all its leads?')) return;
-    await supabase.from('campaigns').delete().eq('id', id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('campaigns').delete().eq('id', id).eq('user_id', user.id);
     fetchCampaigns();
   };
 
