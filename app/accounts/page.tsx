@@ -217,7 +217,7 @@ function AccountModal({
       // One-account limit for X and LinkedIn
       if (!existing) {
         if (form.account_system === 'x') {
-          const { data: existingX } = await supabase.from('x_connections').select('id').limit(1);
+          const { data: existingX } = await supabase.from('x_connections').select('id').eq('user_id', user.id).limit(1);
           if (existingX && existingX.length > 0) {
             setError('Only one X account allowed. Edit or delete the existing account first.');
             setLoading(false);
@@ -489,7 +489,9 @@ export default function AccountsPage() {
 
   const deleteAccount = async (id: string) => {
     if (!confirm('Remove this account? This cannot be undone.')) return;
-    await supabase.from('accounts').delete().eq('id', id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('accounts').delete().eq('id', id).eq('user_id', user.id);
     fetchAccounts();
   };
 

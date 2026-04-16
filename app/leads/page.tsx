@@ -36,6 +36,12 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const names = usernames.split('\n').map(n => n.trim()).filter(Boolean);
+      if (!user) return;
+      // Verify campaign belongs to this user if campaignId provided
+      if (campaignId) {
+        const { data: camp } = await supabase.from('campaigns').select('id').eq('id', campaignId).eq('user_id', user.id).single();
+        if (!camp) { setError('Campaign not found'); setLoading(false); return; }
+      }
       const leads = names.map(name => ({ user_id: user.id, campaign_id: campaignId || null, username: name.replace('@', ''), status: 'pending' as const }));
       const { error } = await supabase.from('leads').insert(leads);
       if (error) throw error;

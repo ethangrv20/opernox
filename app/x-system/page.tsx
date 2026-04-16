@@ -359,12 +359,13 @@ export default function XSystemPage() {
     if (!postText.trim()) return;
     setIsPostingNow(true);
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
     await supabase.from('scheduled_posts').insert({
       platform: 'x',
       post_text: postText.trim(),
       scheduled_for: new Date().toISOString(),
       status: 'scheduled',
-      user_id: user?.id,
+      user_id: user.id,
     });
     setPostText('');
     loadPosts();
@@ -406,7 +407,9 @@ export default function XSystemPage() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from('scheduled_posts').delete().eq('id', id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('scheduled_posts').delete().eq('id', id).eq('user_id', user.id);
     loadPosts();
   };
 
