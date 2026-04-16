@@ -719,7 +719,7 @@ export default function MonitorPage() {
                 <RefreshCw size={13} />
               </button>
               {mentions.length > 0 && (
-                <button onClick={async () => { if (!confirm('Clear all mentions?')) return; await fetch(`${baseUrl}/api/monitor/mentions`, {method:'DELETE'}); loadMentions(); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>
+                <button onClick={async () => { if (!confirm('Clear all mentions?')) return; const u = await getMcUrl(); await fetch(`${u}/api/monitor/mentions`, {method:'DELETE'}); loadMentions(); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>
                   🗑️ Clear All
                 </button>
               )}
@@ -775,7 +775,7 @@ export default function MonitorPage() {
                 <RefreshCw size={13} />
               </button>
               {reviews.length > 0 && (
-                <button onClick={async () => { if (!confirm('Clear all reviews?')) return; await fetch(`${baseUrl}/api/monitor/reviews`, {method:'DELETE'}); loadReviews(); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>
+                <button onClick={async () => { if (!confirm('Clear all reviews?')) return; const u = await getMcUrl(); await fetch(`${u}/api/monitor/reviews`, {method:'DELETE'}); loadReviews(); }} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 14px', color: '#ef4444', cursor: 'pointer', fontSize: 13 }}>
                   🗑️ Clear All
                 </button>
               )}
