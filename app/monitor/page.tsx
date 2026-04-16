@@ -23,6 +23,7 @@ interface MonitorRanking {
   keyword: string;
   keyword_id: string | null;
   position: number | null;
+  rank?: number | null;  // fallback if DB column is 'rank' not 'position'
   search_engine: string;
   searched_at: string;
 }
@@ -574,6 +575,10 @@ export default function MonitorPage() {
                             r.position <= 3 ? <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', borderRadius: 6, padding: '3px 8px', fontWeight: 700 }}>#{r.position}</span>
                             : r.position <= 10 ? <span style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>#{r.position}</span>
                             : <span style={{ background: 'rgba(107,114,128,0.15)', color: '#9ca3af', borderRadius: 6, padding: '3px 8px' }}>#{r.position}</span>
+                          ) : r.rank ? (
+                            r.rank <= 3 ? <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', borderRadius: 6, padding: '3px 8px', fontWeight: 700 }}>#{r.rank}</span>
+                            : r.rank <= 10 ? <span style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>#{r.rank}</span>
+                            : <span style={{ background: 'rgba(107,114,128,0.15)', color: '#9ca3af', borderRadius: 6, padding: '3px 8px' }}>#{r.rank}</span>
                           ) : <span style={{ color: '#4b5563' }}>–</span>}
                         </td>
                         <td style={{ padding: '11px 16px', color: '#6b7280', fontSize: 12 }}>{r.search_engine}</td>
