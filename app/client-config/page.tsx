@@ -156,14 +156,13 @@ export default function ClientConfigPage() {
       const mcUrl = await getMcUrl();
       const baseUrl = window.location.origin;
       const redirectUri = `${baseUrl}/api/gsc/callback`;
-      // Base64-encode state to avoid JSON.parse issues in callback page
+      // Pass state as URL-encoded JSON (safe for URL transmission)
       const state = JSON.stringify({
         clientId: gscClientId.trim(),
         clientSecret: gscClientSecret.trim(),
         propertyUrl: gscPropertyUrl.trim(),
         mcUrl,
       });
-      const stateB64 = btoa(state);
       const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
         `client_id=${encodeURIComponent(gscClientId.trim())}` +
         `&response_type=code` +
@@ -171,7 +170,7 @@ export default function ClientConfigPage() {
         `&prompt=consent` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&scope=${encodeURIComponent('https://www.googleapis.com/auth/webmasters.readonly')}` +
-        `&state=${encodeURIComponent(stateB64)}`;
+        `&state=${encodeURIComponent(state)}`;
       // Open OAuth popup
       const popup = window.open(authUrl, 'gsc_oauth', 'width=600,height=700,scrollbars=yes');
       if (!popup) {

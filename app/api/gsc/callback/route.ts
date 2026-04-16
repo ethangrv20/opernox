@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 (function() {
   var code = ${code ? `"${code.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : 'null'};
   var state = null;
-  try { state = JSON.parse(atob("${Buffer.from(stateStr || '').toString('base64')}")); } catch(e) {}
+  try { state = JSON.parse(decodeURIComponent("${stateStr || ''}")); } catch(e) {}
 
   var result = { success: false, error: 'unknown' };
 
