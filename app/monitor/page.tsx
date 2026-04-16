@@ -234,6 +234,58 @@ export default function MonitorPage() {
     }
   };
 
+  // ─── Scrape Competitor ─────────────────────────────────────────────────
+  const [scrapeCompLoading, setScrapeCompLoading] = useState<string | null>(null);
+  const scrapeCompetitor = async (c: MonitorCompetitor) => {
+    if (scrapeCompLoading) return;
+    setScrapeCompLoading(c.id); setMsg(null);
+    try {
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/scrape/competitors`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ competitor_id: c.id, name: c.name, domain: c.domain })
+      });
+      const data = await res.json();
+      if (data.success) { setMsg({ type: 'ok', text: `Competitor ${c.name} checked` }); loadCompetitors(); }
+      else setMsg({ type: 'error', text: data.error || 'Failed to check competitor' });
+    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
+    finally { setScrapeCompLoading(null); }
+  };
+
+  // ─── Scrape Reviews ───────────────────────────────────────────────────
+  const [scrapeReviewsLoading, setScrapeReviewsLoading] = useState(false);
+  const scrapeReviews = async () => {
+    setScrapeReviewsLoading(true); setMsg(null);
+    try {
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/scrape/reviews`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'google_places', business_name: 'Opernox' })
+      });
+      const data = await res.json();
+      if (data.success) { setMsg({ type: 'ok', text: data.message }); loadReviews(); }
+      else setMsg({ type: 'error', text: data.error || 'Failed to check reviews' });
+    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
+    finally { setScrapeReviewsLoading(false); }
+  };
+
+  // ─── Scrape Mentions ───────────────────────────────────────────────────
+  const [scrapeMentionsLoading, setScrapeMentionsLoading] = useState(false);
+  const scrapeMentions = async () => {
+    setScrapeMentionsLoading(true); setMsg(null);
+    try {
+      const url = await getMcUrl();
+      const res = await fetch(`${url}/api/monitor/scrape/mentions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: keywords[0]?.keyword || '' })
+      });
+      const data = await res.json();
+      if (data.success) { setMsg({ type: 'ok', text: data.message }); loadMentions(); }
+      else setMsg({ type: 'error', text: data.error || 'Failed to find mentions' });
+    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
+    finally { setScrapeMentionsLoading(false); }
+  };
+
   // ─── Load Rankings ────────────────────────────────────────────────────────
   const loadRankings = useCallback(async () => {
     if (!user) return;
@@ -545,6 +597,9 @@ export default function MonitorPage() {
                 <option value="google_news">Google News</option>
                 <option value="reddit">Reddit</option>
               </select>
+              <button onClick={scrapeMentions} disabled={scrapeMentionsLoading} style={{ background: scrapeMentionsLoading ? 'rgba(255,255,255,0.03)' : 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 14px', color: scrapeMentionsLoading ? '#6b7280' : '#60a5fa', cursor: scrapeMentionsLoading ? 'not-allowed' : 'pointer', fontSize: 13 }}>
+                {scrapeMentionsLoading ? 'Scanning...' : '📰 Find Mentions'}
+              </button>
               <button onClick={loadMentions} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '9px 14px', color: '#fff', cursor: 'pointer' }}>
                 <RefreshCw size={13} />
               </button>
@@ -592,6 +647,14 @@ export default function MonitorPage() {
         {/* ── REVIEWS ──────────────────────────────────────────────────────── */}
         {tab === 'reviews' && (
           <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <button onClick={scrapeReviews} disabled={scrapeReviewsLoading} style={{ background: scrapeReviewsLoading ? 'rgba(255,255,255,0.03)' : 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 8, padding: '9px 14px', color: scrapeReviewsLoading ? '#6b7280' : '#fbbf24', cursor: scrapeReviewsLoading ? 'not-allowed' : 'pointer', fontSize: 13 }}>
+                {scrapeReviewsLoading ? 'Scraping...' : '⭐ Check Reviews'}
+              </button>
+              <button onClick={loadReviews} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '9px 14px', color: '#fff', cursor: 'pointer' }}>
+                <RefreshCw size={13} />
+              </button>
+            </div>
             {reviewLoading ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}><Loader2 size={24} style={{ animation: 'spin' }} /></div>
             ) : (
@@ -682,6 +745,9 @@ export default function MonitorPage() {
                           </div>
                         )}
                       </div>
+                      <button onClick={() => scrapeCompetitor(c)} disabled={scrapeCompLoading === c.id} style={{ background: scrapeCompLoading === c.id ? 'rgba(255,255,255,0.03)' : 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 6, padding: '6px 10px', color: scrapeCompLoading === c.id ? '#6b7280' : '#c084fc', cursor: scrapeCompLoading === c.id ? 'not-allowed' : 'pointer', fontSize: 11 }}>
+                        {scrapeCompLoading === c.id ? '...' : '👀 Check'}
+                      </button>
                       <span style={{ color: '#4b5563', fontSize: 11 }}>{timeAgo(c.created_at)}</span>
                     </div>
                   </div>
