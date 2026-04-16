@@ -150,12 +150,13 @@ export default function MonitorPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const res = await fetch(`${mcUrl}/api/monitor/keywords`);
-      if (!res.ok) throw new Error('Failed to load keywords');
+      const url = `${mcUrl}/api/monitor/keywords`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Server returned ${res.status} — ${res.statusText}`);
       const data = await res.json();
       setKeywords(Array.isArray(data) ? data : (data.value || []));
     } catch (e: any) {
-      setMsg({ type: 'error', text: e.message });
+      setMsg({ type: 'error', text: `Keywords: ${e.message}` });
     } finally { setLoading(false); }
   }, [user, mcUrl]);
 
