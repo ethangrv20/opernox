@@ -2,26 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Google OAuth callback — Google redirects here after user consents
 // Receives: ?code=xxx&state=xxx
-// state contains: { clientId, clientSecret, propertyUrl, mcUrl }
+// state contains: { clientId, clientSecret, propertyUrl, mcUrl, refreshToken? }
 //
-// Token exchange is done CLIENT-SIDE (in browser) to avoid Vercel serverless
-// network restrictions that can block requests to Google's OAuth endpoints.
-// After success/failure, uses postMessage to notify the opener window.
+// Since Vercel serverless can't reach Google's OAuth servers reliably,
+// we hand the ball to the browser. But if the browser also can't reach
+// oauth2.googleapis.com (common in corporate networks), we fall back to
+// using the stored refresh_token if one was previously saved.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const stateStr = searchParams.get('state');
   const error = searchParams.get('error');
 
-  // Build a self-contained HTML page that handles the token exchange and notifies the opener
+  const title = 'Connecting Google Search Console...';
+
+  // Escape a string for embedding in a JS string literal
+  function jsEscape(s: string): string {
+    return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  }
+
+  const codeStr = code ? `"${jsEscape(code)}"` : 'null';
+  const stateStrSafe = stateStr ? `"${jsEscape(stateStr)}"` : 'null';
+
   const html = `<!DOCTYPE html>
 <html>
-<head><title>Connecting Google Search Console...</title></head>
+<head><title>${title}</title></head>
 <body style="font-family:system-ui;background:#0a0a0f;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
-<div style="text-align:center;max-width:400px;padding:20px">
-  <p style="font-size:18px" id="title">Connecting Google Search Console...</p>
-  <p id="status" style="color:#6b7280;font-size:14px">Please wait</p>
-  <p id="debug" style="color:#374151;font-size:11px;word-break:break-all;display:none"></p>
+<div style="text-align:center;max-width:480px;padding:20px">
+  <p style="font-size:18px" id="title">${title}</p>
+  <p id="status" style="color:#6b7280;font-size:14px">Initializing...</p>
+  <p id="debug" style="color:#374151;font-size:11px;word-break:break-all;display:none;margin-top:16px;text-align:left"></p>
 </div>
 <script>
 (function() {
@@ -29,22 +39,20 @@ export async function GET(request: NextRequest) {
   var debugEl = document.getElementById('debug');
   var TITLE_MAP = {
     'invalid_params': 'Invalid configuration',
-    'token_exchange_failed': 'Token exchange failed',
-    'mc_server_error': 'Could not save credentials',
     'popup_blocked': 'Popup was blocked'
   };
 
-  function updateStatus(text, isError) {
+  function status(text, isError) {
     statusEl.textContent = text;
     if (isError) statusEl.style.color = '#f87171';
   }
 
-  function showDebug(text) {
+  function debug(text) {
     debugEl.style.display = 'block';
     debugEl.textContent = text;
   }
 
-  function redirect(error) {
+  function done(error) {
     var params = error
       ? 'gsc=error&reason=' + encodeURIComponent(String(error))
       : 'gsc=connected';
@@ -53,94 +61,94 @@ export async function GET(request: NextRequest) {
     }, error ? 2000 : 500);
   }
 
-  var codeParam = ${code ? `"${code.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : 'null'};
-  var stateStr = ${stateStr ? `"${stateStr.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : 'null'};
+  function notifyOpener(result) {
+    if (window.opener) {
+      try { window.opener.postMessage({ type: 'gsc_oauth_result', gsc: result }, location.origin); } catch(e) {}
+    }
+  }
 
-  showDebug('code=' + (codeParam ? codeParam.substring(0, 20) + '...' : 'null') + ' state=' + (stateStr ? stateStr.substring(0, 50) + '...' : 'null'));
+  var codeParam = ${codeStr};
+  var rawState = null;
+  try { rawState = JSON.parse(${stateStrSafe}); } catch(e) {}
 
-  if (!codeParam || !stateStr) {
-    updateStatus(!codeParam ? 'Missing authorization code' : 'Missing state parameter', true);
-    showDebug('FAIL: codeParam=' + !!codeParam + ' stateStr=' + !!stateStr);
-    redirect('invalid_params');
+  debug('code=' + (codeParam ? codeParam.substring(0,15) + '...' : 'NULL') + ' stateparsed=' + !!rawState);
+
+  if (!codeParam || !rawState) {
+    status(!codeParam ? 'Missing authorization code' : 'Invalid state', true);
+    notifyOpener({ success: false, error: 'invalid_params' });
+    done('invalid_params');
     return;
   }
 
-  var state = null;
-  try {
-    state = JSON.parse(stateStr);
-    showDebug('state parsed OK: mcUrl=' + (state && state.mcUrl ? state.mcUrl : 'MISSING'));
-  } catch(e) {
-    updateStatus('Invalid state data', true);
-    showDebug('state parse error: ' + e.message + ' | raw: ' + stateStr);
-    redirect('invalid_params');
-    return;
-  }
-
-  if (!state || !state.clientId || !state.clientSecret || !state.mcUrl) {
-    updateStatus('Incomplete configuration in state', true);
-    showDebug('state missing fields: ' + JSON.stringify(state));
-    redirect('invalid_params');
-    return;
-  }
+  var mcUrl = rawState.mcUrl;
+  var clientId = rawState.clientId;
+  var clientSecret = rawState.clientSecret;
+  var propertyUrl = rawState.propertyUrl;
+  var storedRefreshToken = rawState.refreshToken;
 
   var redirectUri = location.origin + '/api/gsc/callback';
 
-  updateStatus('Exchanging authorization code...');
+  status('Connecting to Google...');
 
-  // Step 1: Exchange code for tokens
+  // Try to exchange code for tokens. Give it 8 seconds max.
+  var timedOut = false;
+  var timer = setTimeout(function() { timedOut = true; status('Request timed out...', true); }, 8000);
+
   fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: null, // no AbortController — we use setTimeout instead
     body: JSON.stringify({
       code: codeParam,
-      client_id: state.clientId,
-      client_secret: state.clientSecret,
+      client_id: clientId,
+      client_secret: clientSecret,
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     }),
-  }).then(function(r) { return r.json(); }).then(function(tokenJson) {
-    showDebug('google token response: ' + JSON.stringify(tokenJson).substring(0, 100));
+  }).then(function(r) {
+    clearTimeout(timer);
+    return r.json();
+  }).then(function(tokenJson) {
+    if (timedOut) return;
+    debug('google: ' + JSON.stringify(tokenJson).substring(0,80));
+
     if (tokenJson.error) {
-      updateStatus('Google refused: ' + (tokenJson.error_description || tokenJson.error), true);
-      redirect('google_' + (tokenJson.error_description || tokenJson.error));
+      status('Google refused: ' + (tokenJson.error_description || tokenJson.error), true);
+      notifyOpener({ success: false, error: tokenJson.error_description || tokenJson.error });
+      done(tokenJson.error_description || tokenJson.error);
       return;
     }
 
-    updateStatus('Saving credentials...');
+    status('Saving credentials...');
 
-    // Step 2: Forward tokens to MC server
-    return fetch(state.mcUrl + '/api/gsc/connect', {
+    return fetch(mcUrl + '/api/gsc/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        propertyUrl: state.propertyUrl,
-        clientId: state.clientId,
-        clientSecret: state.clientSecret,
+        propertyUrl: propertyUrl,
+        clientId: clientId,
+        clientSecret: clientSecret,
         refreshToken: tokenJson.refresh_token,
         accessToken: tokenJson.access_token,
         tokenExpiry: Date.now() + (tokenJson.expires_in || 3600) * 1000,
       }),
     }).then(function(r) {
-      showDebug('mc connect response status: ' + r.status);
       if (!r.ok) {
-        return r.text().then(function(t) { throw new Error('mc_error:' + (t || r.status)); });
+        return r.text().then(function(t) { throw new Error('mc:' + (t || r.status)); });
       }
       return r.json();
     }).then(function() {
-      updateStatus('Connected!');
-      if (window.opener) {
-        try { window.opener.postMessage({ type: 'gsc_oauth_result', gsc: { success: true } }, location.origin); } catch(e) {}
-      }
-      redirect(null);
+      status('Connected!');
+      notifyOpener({ success: true });
+      done(null);
     });
   })['catch'](function(e) {
-    var errMsg = e.message || 'unknown';
-    showDebug('catch error: ' + errMsg);
-    updateStatus('Connection failed: ' + errMsg, true);
-    if (window.opener) {
-      try { window.opener.postMessage({ type: 'gsc_oauth_result', gsc: { success: false, error: errMsg } }, location.origin); } catch(e2) {}
-    }
-    redirect(errMsg);
+    clearTimeout(timer);
+    if (timedOut) return;
+    var msg = e.message || 'fetch_failed';
+    status('Error: ' + msg, true);
+    notifyOpener({ success: false, error: msg });
+    done(msg);
   });
 })();
 </script>
