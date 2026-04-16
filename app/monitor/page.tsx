@@ -524,43 +524,45 @@ export default function MonitorPage() {
           <div>
             {reviewLoading ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}><Loader2 size={24} style={{ animation: 'spin' }} /></div>
-            ) : reviews.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: '#4b5563' }}>
-                <Star size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                <p style={{ fontSize: 15, margin: '0 0 6px' }}>No reviews tracked yet</p>
-                <p style={{ fontSize: 13, margin: 0 }}>Reviews from Google, Yelp, Trustpilot & G2 will appear here</p>
-              </div>
             ) : (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '16px 20px' }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: '#fbbf24' }}>★ {avgRating}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>
-                    <div style={{ color: '#e5e7eb', fontWeight: 600 }}>{reviews.length} reviews tracked</div>
-                    <div>Across Google, Yelp, Trustpilot, G2</div>
-                  </div>
+              reviews.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 60, color: '#4b5563' }}>
+                  <Star size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                  <p style={{ fontSize: 15, margin: '0 0 6px' }}>No reviews tracked yet</p>
+                  <p style={{ fontSize: 13, margin: 0 }}>Reviews from Google, Yelp, Trustpilot & G2 will appear here</p>
                 </div>
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {reviews.map(r => (
-                    <div key={r.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '14px 18px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <span style={{ background: platformColor(r.platform) + '22', color: platformColor(r.platform), borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{r.platform}</span>
-                        {r.rating && (
-                          <span style={{ color: '#fbbf24', fontSize: 13 }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
-                        )}
-                        <span style={{ color: '#4b5563', fontSize: 11, marginLeft: 'auto' }}>{r.reviewed_at ? timeAgo(r.reviewed_at) : ''}</span>
-                      </div>
-                      {r.reviewer_name && <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>By {r.reviewer_name}</div>}
-                      {r.review_text && <div style={{ fontSize: 13, color: '#d1d5db', lineHeight: 1.5 }}>{r.review_text}</div>}
-                      {r.review_url && (
-                        <a href={r.review_url} target="_blank" rel="noopener noreferrer"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#3b82f6', fontSize: 12, marginTop: 6, textDecoration: 'none' }}>
-                          View review <ExternalLink size={10} />
-                        </a>
-                      )}
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '16px 20px' }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: '#fbbf24' }}>★ {avgRating}</div>
+                    <div style={{ fontSize: 13, color: '#6b7280' }}>
+                      <div style={{ color: '#e5e7eb', fontWeight: 600 }}>{reviews.length} reviews tracked</div>
+                      <div>Across Google, Yelp, Trustpilot, G2</div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {reviews.map(r => (
+                      <div key={r.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '14px 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                          <span style={{ background: platformColor(r.platform) + '22', color: platformColor(r.platform), borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{r.platform}</span>
+                          {r.rating && (
+                            <span style={{ color: '#fbbf24', fontSize: 13 }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                          )}
+                          <span style={{ color: '#4b5563', fontSize: 11, marginLeft: 'auto' }}>{r.reviewed_at ? timeAgo(r.reviewed_at) : ''}</span>
+                        </div>
+                        {r.reviewer_name && <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>By {r.reviewer_name}</div>}
+                        {r.review_text && <div style={{ fontSize: 13, color: '#d1d5db', lineHeight: 1.5 }}>{r.review_text}</div>}
+                        {r.review_url ? (
+                          <a href={r.review_url} target="_blank" rel="noopener noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#3b82f6', fontSize: 12, marginTop: 6, textDecoration: 'none' }}>
+                            View review <ExternalLink size={10} />
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
             )}
           </div>
         )}
