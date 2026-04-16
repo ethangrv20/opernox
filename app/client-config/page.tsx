@@ -156,12 +156,14 @@ export default function ClientConfigPage() {
       const mcUrl = await getMcUrl();
       const baseUrl = window.location.origin;
       const redirectUri = `${baseUrl}/api/gsc/callback`;
+      // Base64-encode state to avoid JSON.parse issues in callback page
       const state = JSON.stringify({
         clientId: gscClientId.trim(),
         clientSecret: gscClientSecret.trim(),
         propertyUrl: gscPropertyUrl.trim(),
         mcUrl,
       });
+      const stateB64 = btoa(state);
       const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
         `client_id=${encodeURIComponent(gscClientId.trim())}` +
         `&response_type=code` +
@@ -169,7 +171,7 @@ export default function ClientConfigPage() {
         `&prompt=consent` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&scope=${encodeURIComponent('https://www.googleapis.com/auth/webmasters.readonly')}` +
-        `&state=${encodeURIComponent(state)}`;
+        `&state=${encodeURIComponent(stateB64)}`;
       // Open OAuth popup
       const popup = window.open(authUrl, 'gsc_oauth', 'width=600,height=700,scrollbars=yes');
       if (!popup) {
@@ -177,11 +179,27 @@ export default function ClientConfigPage() {
         setGscConnecting(false);
         return;
       }
-      // Poll for the callback result via storage event (same origin)
+      // Listen for postMessage from the callback popup
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type !== 'gsc_oauth_result') return;
+        if (event.origin !== window.location.origin) return;
+        window.removeEventListener('message', handleMessage);
+        const { gsc } = event.data;
+        if (gsc?.success) {
+          setGscConnected(true);
+          setGscPropertyUrl(gscPropertyUrl);
+          setGscMsg({ type: 'ok', text: 'Google Search Console connected!' });
+        } else {
+          setGscMsg({ type: 'error', text: 'Google connection failed: ' + (gsc?.error || 'Unknown error') });
+        }
+        setGscConnecting(false);
+      };
+      window.addEventListener('message', handleMessage);
+      // Safety fallback: if popup is closed without message, check status
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed);
-          // Re-check GSC status after popup closes
+          window.removeEventListener('message', handleMessage);
           fetch(`${mcUrl}/api/gsc/status`)
             .then(r => r.json())
             .then(data => {
@@ -194,9 +212,12 @@ export default function ClientConfigPage() {
               }
               setGscConnecting(false);
             })
-            .catch(() => { setGscConnecting(false); });
+            .catch(() => {
+              setGscMsg({ type: 'error', text: 'Connection check failed — try again' });
+              setGscConnecting(false);
+            });
         }
-      }, 500);
+      }, 1000);
     } catch (e: any) {
       setGscMsg({ type: 'error', text: e.message });
       setGscConnecting(false);

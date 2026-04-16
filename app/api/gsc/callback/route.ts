@@ -4,91 +4,99 @@ import { NextRequest, NextResponse } from 'next/server';
 // Receives: ?code=xxx&state=xxx
 // state contains: { clientId, clientSecret, propertyUrl, mcUrl }
 //
-// NOTE: Token exchange is done CLIENT-SIDE (in browser) to avoid Vercel serverless
+// Token exchange is done CLIENT-SIDE (in browser) to avoid Vercel serverless
 // network restrictions that can block requests to Google's OAuth endpoints.
+// After success/failure, uses postMessage to notify the opener window.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const stateStr = searchParams.get('state');
   const error = searchParams.get('error');
 
-  // If user denied consent
-  if (error) {
-    return NextResponse.redirect(
-      new URL(`/client-config?gsc=error&reason=${encodeURIComponent(error)}`, request.url)
-    );
-  }
+  const errorMsg = error || (!code ? 'missing_code' : !stateStr ? 'missing_state' : null);
 
-  if (!code || !stateStr) {
-    return NextResponse.redirect(new URL('/client-config?gsc=error&reason=missing_params', request.url));
-  }
-
-  let state: { clientId: string; clientSecret: string; propertyUrl: string; mcUrl: string };
-  try {
-    state = JSON.parse(stateStr);
-  } catch {
-    return NextResponse.redirect(new URL('/client-config?gsc=error&reason=invalid_state', request.url));
-  }
-
-  const { clientId, clientSecret, propertyUrl, mcUrl } = state;
-  const baseUrl = getBaseUrl(request);
-
-  // Return an HTML page that does the token exchange in the browser
+  // Build a self-contained HTML page that handles the token exchange and notifies the opener
   const html = `<!DOCTYPE html>
 <html>
 <head><title>Connecting Google Search Console...</title></head>
 <body style="font-family:system-ui;background:#0a0a0f;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
-<div style="text-align:center">
-  <p style="font-size:18px">Connecting Google Search Console...</p>
-  <p id="status" style="color:#6b7280;font-size:14px">Exchanging authorization code...</p>
+<div style="text-align:center;max-width:400px;padding:20px">
+  <p style="font-size:18px" id="title">Connecting Google Search Console...</p>
+  <p id="status" style="color:#6b7280;font-size:14px">Please wait</p>
 </div>
 <script>
-(async () => {
-  const redirectUri = '${baseUrl}/api/gsc/callback';
-  try {
-    // Exchange auth code for tokens (done in browser — avoids Vercel network restrictions)
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+(function() {
+  var code = ${code ? `"${code.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : 'null'};
+  var state = null;
+  try { state = JSON.parse(atob("${Buffer.from(stateStr || '').toString('base64')}")); } catch(e) {}
+
+  var result = { success: false, error: 'unknown' };
+
+  if (!code || !state) {
+    result = { success: false, error: 'invalid_params' };
+  } else {
+    var redirectUri = location.origin + '/api/gsc/callback';
+    // Step 1: Exchange code for tokens
+    fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        code: '${code}',
-        client_id: '${clientId}',
-        client_secret: '${clientSecret}',
+        code: code,
+        client_id: state.clientId,
+        client_secret: state.clientSecret,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       }),
+    }).then(function(r) { return r.json(); }).then(function(tokenJson) {
+      if (tokenJson.error) {
+        result = { success: false, error: tokenJson.error_description || tokenJson.error };
+        return;
+      }
+      // Step 2: Forward tokens to MC server
+      return fetch(state.mcUrl + '/api/gsc/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyUrl: state.propertyUrl,
+          clientId: state.clientId,
+          clientSecret: state.clientSecret,
+          refreshToken: tokenJson.refresh_token,
+          accessToken: tokenJson.access_token,
+          tokenExpiry: Date.now() + (tokenJson.expires_in || 3600) * 1000,
+        }),
+      }).then(function(r) { return r.ok ? r.json() : r.text().then(function(t) { throw new Error(t || 'mc_server_error'); }); })
+        .then(function() {
+          result = { success: true };
+        });
+    })['catch'](function(e) {
+      result = { success: false, error: e.message || 'fetch_failed' };
     });
-    const tokenJson = await tokenRes.json();
-
-    if (tokenJson.error) {
-      throw new Error(tokenJson.error_description || tokenJson.error);
-    }
-
-    document.getElementById('status').textContent = 'Saving credentials...';
-
-    // Forward tokens to the client's MC server to store
-    const connectRes = await fetch('${mcUrl}/api/gsc/connect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        propertyUrl: '${propertyUrl}',
-        clientId: '${clientId}',
-        clientSecret: '${clientSecret}',
-        refreshToken: tokenJson.refresh_token,
-        accessToken: tokenJson.access_token,
-        tokenExpiry: Date.now() + (tokenJson.expires_in || 3600) * 1000,
-      }),
-    });
-
-    if (!connectRes.ok) {
-      const errData = await connectRes.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errData.error || 'Failed to save credentials');
-    }
-
-    window.location.href = '/client-config?gsc=connected';
-  } catch (e) {
-    window.location.href = '/client-config?gsc=error&reason=' + encodeURIComponent(e.message || 'token_exchange_failed');
   }
+
+  // Wait for async, then notify opener and close
+  function done() {
+    if (window.opener) {
+      try {
+        window.opener.postMessage({ type: 'gsc_oauth_result', gsc: result }, location.origin);
+      } catch(e) {}
+    }
+    var params = result.success ? 'gsc=connected' : 'gsc=error&reason=' + encodeURIComponent(result.error || 'failed');
+    var target = location.origin + '/client-config?' + params;
+    // Small delay so the message can be received
+    setTimeout(function() {
+      location.href = target;
+    }, 500);
+  }
+
+  // Poll until async is done (max 15s)
+  var ticks = 0;
+  var interval = setInterval(function() {
+    ticks++;
+    if (result.error !== 'unknown' || ticks > 150) {
+      clearInterval(interval);
+      done();
+    }
+  }, 100);
 })();
 </script>
 </body>
@@ -97,10 +105,4 @@ export async function GET(request: NextRequest) {
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   });
-}
-
-function getBaseUrl(request: NextRequest): string {
-  const host = request.headers.get('host') || '';
-  const proto = host.includes('localhost') ? 'http' : 'https';
-  return `${proto}://${host}`;
 }
