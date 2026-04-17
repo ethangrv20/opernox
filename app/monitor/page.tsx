@@ -9,7 +9,7 @@ import {
   Loader2, RefreshCw, ExternalLink, MessageSquare, X, BarChart2
 } from 'lucide-react';
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 interface MonitorKeyword {
   id: string;
   keyword: string;
@@ -59,7 +59,7 @@ interface MonitorCompetitor {
   created_at: string;
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function sentimentColor(s: string) {
   if (s === 'positive') return '#10b981';
   if (s === 'negative') return '#ef4444';
@@ -101,7 +101,7 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(diff/86400000)}d ago`;
 }
 
-// â”€â”€â”€ Keyword Details Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Keyword Details Modal â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function KeywordDetailsModal({
   keyword,
   rankings,
@@ -196,7 +196,7 @@ function KeywordDetailsModal({
           ) : (
             <div style={{ display: 'grid', gap: 24 }}>
 
-              {/* â”€â”€ RANKINGS â”€â”€ */}
+              {/* â"€â"€ RANKINGS â"€â"€ */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -253,7 +253,7 @@ function KeywordDetailsModal({
                                 r.rank <= 3 ? <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', borderRadius: 6, padding: '2px 7px', fontWeight: 700, fontSize: 12 }}>#{r.rank}</span>
                                 : r.rank <= 10 ? <span style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', borderRadius: 6, padding: '2px 7px', fontWeight: 600, fontSize: 12 }}>#{r.rank}</span>
                                 : <span style={{ background: 'rgba(107,114,128,0.15)', color: '#9ca3af', borderRadius: 6, padding: '2px 7px', fontSize: 12 }}>#{r.rank}</span>
-                              ) : <span style={{ color: '#4b5563' }}>â€“</span>}
+                              ) : <span style={{ color: '#4b5563' }}>-</span>}
                             </td>
                             <td style={{ padding: '9px 14px', color: '#6b7280', fontSize: 12 }}>{r.search_engine}</td>
                             <td style={{ padding: '9px 14px', color: '#6b7280', fontSize: 12 }}>{timeAgo(r.searched_at)}</td>
@@ -270,7 +270,7 @@ function KeywordDetailsModal({
                 )}
               </div>
 
-              {/* â”€â”€ MENTIONS â”€â”€ */}
+              {/* â"€â"€ MENTIONS â"€â"€ */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -341,7 +341,7 @@ function KeywordDetailsModal({
                 )}
               </div>
 
-              {/* â”€â”€ REVIEWS â”€â”€ */}
+              {/* â"€â"€ REVIEWS â"€â"€ */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -349,7 +349,7 @@ function KeywordDetailsModal({
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb' }}>Reviews</span>
                     {reviews.length > 0 && avgRating && (
                       <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>
-                        {avgRating} avg Â· {reviews.length}
+                        {avgRating} avg · {reviews.length}
                       </span>
                     )}
                   </div>
@@ -389,7 +389,7 @@ function KeywordDetailsModal({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                           <span style={{ background: platformColor(r.platform) + '22', color: platformColor(r.platform), borderRadius: 5, padding: '2px 7px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>{r.platform}</span>
                           {r.rating && (
-                            <span style={{ color: '#fbbf24', fontSize: 12 }}>{'â˜…'.repeat(r.rating)}{'â˜†'.repeat(5 - r.rating)}</span>
+                            <span style={{ color: '#fbbf24', fontSize: 12 }}>{'#'.repeat(r.rating)}{'-'.repeat(5 - r.rating)}</span>
                           )}
                           <span style={{ color: '#4b5563', fontSize: 11, marginLeft: 'auto' }}>{r.reviewed_at ? timeAgo(r.reviewed_at) : ''}</span>
                         </div>
@@ -415,7 +415,7 @@ function KeywordDetailsModal({
   );
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Main Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 export default function MonitorPage() {
   const [user, setUser] = useState<any>(null);
   const [mainTab, setMainTab] = useState<'keywords' | 'competitors'>('keywords');
@@ -454,7 +454,7 @@ export default function MonitorPage() {
   const [businessName, setBusinessName] = useState('');
   const [configComplete, setConfigComplete] = useState<boolean | null>(null);
 
-  // â”€â”€â”€ Keyword modal state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€ Keyword modal state â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const [selectedKw, setSelectedKw] = useState<MonitorKeyword | null>(null);
   const [kwRankings, setKwRankings] = useState<MonitorRanking[]>([]);
   const [kwMentions, setKwMentions] = useState<MonitorMention[]>([]);
@@ -464,7 +464,7 @@ export default function MonitorPage() {
   const [scrapeMentionsModalLoading, setScrapeMentionsModalLoading] = useState(false);
   const [scrapeReviewsModalLoading, setScrapeReviewsModalLoading] = useState(false);
 
-  // â”€â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€ Init â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -498,7 +498,7 @@ export default function MonitorPage() {
     if (user) loadGscData();
   }, [user]);
 
-  // â”€â”€â”€ Load functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€ Load functions â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const loadKeywords = async () => {
     if (!user) return;
     setLoading(true); setMsg(null);
@@ -522,7 +522,7 @@ export default function MonitorPage() {
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
   };
 
-  // â”€â”€â”€ Keyword actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€ Keyword actions â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const addKeyword = async () => {
     if (!newKw.trim()) return;
     setAddingKw(true); setMsg(null);
@@ -550,7 +550,7 @@ export default function MonitorPage() {
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
   };
 
-  // â”€â”€â”€ Modal: open and load data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€ Modal: open and load data â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const openKeywordModal = async (kw: MonitorKeyword) => {
     setSelectedKw(kw);
     setModalLoading(true);
@@ -659,7 +659,7 @@ export default function MonitorPage() {
     finally { setScrapeReviewsModalLoading(false); }
   };
 
-  // â”€â”€â”€ Competitor actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€ Competitor actions â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   const addCompetitor = async () => {
     if (!newComp.name.trim()) return;
     setAddingComp(true);
@@ -721,14 +721,14 @@ export default function MonitorPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', maxWidth: 440 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>ðŸ”’</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>ðŸ"'</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Setup required</h2>
           <p style={{ color: '#6b7280', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
             Complete your Client Config before using SEO Monitor.
           </p>
           <button onClick={() => window.location.href = '/client-config'}
             style={{ background: '#06b6d4', border: 'none', borderRadius: 8, padding: '12px 24px', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            Go to Client Config â†’
+            Go to Client Config -&gt;
           </button>
         </div>
       </div>
@@ -807,12 +807,12 @@ export default function MonitorPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, color: '#e5e7eb', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kw.keys?.[0]}</div>
                         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-                          <span style={{ color: '#10b981', fontWeight: 600 }}>{Number(kw.clicks).toLocaleString()}</span> clicks Â·
-                          <span style={{ color: '#f59e0b', fontWeight: 600 }}>{Number(kw.impressions).toLocaleString()}</span> impressions Â·
+                          <span style={{ color: '#10b981', fontWeight: 600 }}>{Number(kw.clicks).toLocaleString()}</span> clicks ·
+                          <span style={{ color: '#f59e0b', fontWeight: 600 }}>{Number(kw.impressions).toLocaleString()}</span> impressions ·
                           Avg position <span style={{ color: kw.position <= 3 ? '#10b981' : kw.position <= 10 ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{Number(kw.position).toFixed(1)}</span>
                         </div>
                       </div>
-                      <div style={{ fontSize: 11, color: '#4b5563', minWidth: 40, textAlign: 'right' }}>CTR {kw.ctr ? `${(kw.ctr * 100).toFixed(1)}%` : 'â€“'}</div>
+                      <div style={{ fontSize: 11, color: '#4b5563', minWidth: 40, textAlign: 'right' }}>CTR {kw.ctr ? `${(kw.ctr * 100).toFixed(1)}%` : '-'}</div>
                     </div>
                   ))}
                 </div>
@@ -822,15 +822,15 @@ export default function MonitorPage() {
 
             {gscData?.connected && (!Array.isArray(gscData.keywords) || gscData.keywords.length === 0) && !gscLoading && (
               <div style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
-                <div style={{ fontSize: 13, color: '#f59e0b', marginBottom: 6 }}>Google Search Console connected â€” no keyword data yet</div>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>Google takes 1â€“3 days to index a new property.</div>
+                <div style={{ fontSize: 13, color: '#f59e0b', marginBottom: 6 }}>Google Search Console connected - no keyword data yet</div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>Google takes 1-3 days to index a new property.</div>
               </div>
             )}
 
             {!gscData?.connected && !gscLoading && (
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Google Search Console not connected</div>
-                <div style={{ fontSize: 12, color: '#4b5563' }}>Set up in <a href="/client-config" style={{ color: '#3b82f6' }}>Client Config â†’ Google Search Console</a></div>
+                <div style={{ fontSize: 12, color: '#4b5563' }}>Set up in <a href="/client-config" style={{ color: '#3b82f6' }}>Client Config -&gt; Google Search Console</a></div>
               </div>
             )}
 
@@ -853,7 +853,7 @@ export default function MonitorPage() {
                     </div>
                     <button onClick={() => openKeywordModal(kw)}
                       style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.25)', borderRadius: 8, padding: '8px 14px', color: '#f43f5e', cursor: 'pointer', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      View Details â†’
+                      View Details â†'
                     </button>
                     <button onClick={() => deleteKeyword(kw.id)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: 8, color: '#ef4444', cursor: 'pointer' }}>
                       <Trash2 size={13} />
@@ -908,7 +908,7 @@ export default function MonitorPage() {
                       </div>
                       <button onClick={() => scrapeCompetitor(c)} disabled={scrapeCompLoading === c.id}
                         style={{ background: scrapeCompLoading === c.id ? 'rgba(255,255,255,0.03)' : 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 6, padding: '6px 10px', color: scrapeCompLoading === c.id ? '#6b7280' : '#c084fc', cursor: scrapeCompLoading === c.id ? 'not-allowed' : 'pointer', fontSize: 11 }}>
-                        {scrapeCompLoading === c.id ? '...' : 'ðŸ‘€ Check'}
+                        {scrapeCompLoading === c.id ? '...' : 'Check'}
                       </button>
                       <span style={{ color: '#4b5563', fontSize: 11 }}>{timeAgo(c.created_at)}</span>
                     </div>
