@@ -7,3 +7,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const SUPABASE_URL = supabaseUrl;
 export const SUPABASE_ANON_KEY = supabaseAnonKey;
+
+/**
+ * Returns the Supabase session access token from localStorage.
+ * Used to pass auth to API routes that need it (server-side Supabase calls).
+ */
+export async function getSupabaseToken(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
