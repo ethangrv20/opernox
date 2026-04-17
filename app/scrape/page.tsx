@@ -190,7 +190,7 @@ export default function ScrapePage() {
       const res = await fetch(`${getMcUrl()}/api/scrape/jobs`);
       if (!res.ok) return;
       const data = await res.json();
-      setJobs(data.sort((a: any, b: any) => new Date(b.created_at) - new Date(a.created_at)));
+      setJobs((data as any[]).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch {}
   }
 
@@ -225,7 +225,7 @@ export default function ScrapePage() {
 
   function toggleExpand(id: string) {
     setExpandedJob(prev => prev === id ? null : id);
-    setJobs(prev => prev.map(j => j.id === id ? { ...j, _expanded: prev !== id } : j));
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, _expanded: !j._expanded } : j));
   }
 
   async function deleteJob(id: string) {
@@ -307,7 +307,7 @@ export default function ScrapePage() {
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: activeType.color }}
               >
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <activeType.icon size={16} />}
                 {loading ? 'Scraping...' : 'Scrape'}
               </button>
             </div>
