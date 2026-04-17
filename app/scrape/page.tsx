@@ -241,6 +241,8 @@ export default function ScrapePage() {
         body.locationRadius = radius;
         body.searchMode = searchMode;
         body.onlyWithWebsite = hasWebsite;
+        body.hasPhone = hasPhone;
+        body.minRating = minRating;
       }
 
       const baseUrl = await getMcUrl();
