@@ -11,7 +11,7 @@ type ScrapeType = 'maps' | 'keywords' | 'domain';
 type ScrapeStatus = 'pending' | 'running' | 'done' | 'error';
 
 const SCRAPE_TYPES = [
-  { id: 'maps' as ScrapeType, label: 'Maps', icon: MapPin, color: '#ef4444', placeholder: 'restaurants in chicago, lawyers near me...', hint: 'Find businesses on Google Maps' },
+  { id: 'maps' as ScrapeType, label: 'Maps', icon: MapPin, color: '#ef4444', placeholder: 'roofing companies new york, dentists in chicago...', hint: 'Takes 30-60s — real Google Maps data' },
   { id: 'keywords' as ScrapeType, label: 'Keywords', icon: Search, color: '#3b82f6', placeholder: 'marketing software, CRM tools...', hint: 'Get keyword ideas from Google' },
   { id: 'domain' as ScrapeType, label: 'Domain', icon: Globe, color: '#22c55e', placeholder: 'https://example.com', hint: 'Scrape a URL for contact info & meta' },
 ];
@@ -156,7 +156,9 @@ export default function ScrapePage() {
     try {
       const res = await fetch(`${getMcUrl()}/api/scrape/jobs`);
       if (!res.ok) return;
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { return; }
       setJobs(data.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch { /* silent */ }
   }
@@ -172,12 +174,14 @@ export default function ScrapePage() {
       else body.query = input;
       body.max_results = maxResults;
       const res = await fetch(`${getMcUrl()}/api/scrape/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error('Server returned an error. Try again in a moment.'); }
+      if (!res.ok) throw new Error(data.error || 'Failed to start scrape');
       setInput('');
       await loadJobs();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || err.toString());
     } finally {
       setLoading(false);
     }
