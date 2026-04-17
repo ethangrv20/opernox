@@ -154,7 +154,8 @@ export default function ScrapePage() {
 
   async function loadJobs() {
     try {
-      const res = await fetch(`${getMcUrl()}/api/scrape/jobs`);
+      const baseUrl = await getMcUrl();
+      const res = await fetch(`${baseUrl}/api/scrape/jobs`);
       if (!res.ok) return;
       const text = await res.text();
       let data;
@@ -173,7 +174,8 @@ export default function ScrapePage() {
       if (tab === 'domain') body.input_url = input;
       else body.query = input;
       body.max_results = maxResults;
-      const res = await fetch(`${getMcUrl()}/api/scrape/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const baseUrl = await getMcUrl();
+      const res = await fetch(`${baseUrl}/api/scrape/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch { throw new Error('Server returned an error. Try again in a moment.'); }
@@ -188,7 +190,8 @@ export default function ScrapePage() {
   }
 
   async function deleteJob(id: string) {
-    await fetch(`${getMcUrl()}/api/scrape/jobs/${id}`, { method: 'DELETE' });
+    const baseUrl = await getMcUrl();
+    await fetch(`${baseUrl}/api/scrape/jobs/${id}`, { method: 'DELETE' });
     setJobs(prev => prev.filter(j => j.id !== id));
   }
 
