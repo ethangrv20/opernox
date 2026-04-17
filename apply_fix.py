@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+
 with open('app/monitor/page.tsx', 'r', encoding='utf-8') as f:
     content = f.read()
 
-# ─── 1. FIX GSC amber message for connected-but-no-data state ────────────────
+# CHANGE 1: GSC amber message
 content = content.replace(
     """{/* GSC connected but no keywords yet (property still processing) */}
             {gscData?.connected && !gscData.keywords?.length && !gscLoading && (
@@ -19,43 +23,45 @@ content = content.replace(
             )}"""
 )
 
-# ─── 2. FIX AdsPower warnings in Mentions and Reviews tabs ───────────────────
+# CHANGE 2: AdsPower Mentions warning
 content = content.replace(
     """<p style={{ fontSize: 12, color: '#374151', marginTop: 8, padding: '8px 14px', background: 'rgba(59,130,246,0.07)', borderRadius: 8, display: 'inline-block' }}>⚠️ Requires AdsPower browser running on this VPS</p>""",
     """<p style={{ fontSize: 12, color: '#6b7280', marginTop: 8, padding: '8px 14px', background: 'rgba(59,130,246,0.07)', borderRadius: 8, display: 'inline-block' }}>ℹ️ Mentions are scraped from Google News &amp; Reddit using an AdsPower browser on your VPS. Keep AdsPower open with a profile active to enable scraping.</p>"""
 )
+
+# CHANGE 3: AdsPower Reviews warning
 content = content.replace(
     """<p style={{ fontSize: 12, color: '#374151', marginTop: 8, padding: '8px 14px', background: 'rgba(251,191,36,0.07)', borderRadius: 8, display: 'inline-block' }}>⚠️ Requires AdsPower browser running on this VPS</p>""",
     """<p style={{ fontSize: 12, color: '#6b7280', marginTop: 8, padding: '8px 14px', background: 'rgba(251,191,36,0.07)', borderRadius: 8, display: 'inline-block' }}>ℹ️ Reviews are scraped from Google Places &amp; other platforms using an AdsPower browser on your VPS. Keep AdsPower open with a profile running to enable review scraping.</p>"""
 )
 
-# ─── 3. Add expand state + filtered load functions after "// Reviews" state ───
-old_reviews_state = """  // Reviews
+# CHANGE 4: Add expand state after reviews state
+content = content.replace(
+    """  // Reviews
   const [reviews, setReviews] = useState<MonitorReview[]>([]);
-  const [reviewLoading, setReviewLoading] = useState(false);"""
-
-new_reviews_state = """  // Reviews
+  const [reviewLoading, setReviewLoading] = useState(false);""",
+    """  // Reviews
   const [reviews, setReviews] = useState<MonitorReview[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
 
-  // Expand keyword row to show all SEO data in one place
+  // Keyword row expand — shows rankings + mentions + reviews inline
   const [expandedKwId, setExpandedKwId] = useState<string | null>(null);
   const [kwRankings, setKwRankings] = useState<MonitorRanking[]>([]);
   const [kwMentions, setKwMentions] = useState<MonitorMention[]>([]);
   const [kwReviews, setKwReviews] = useState<MonitorReview[]>([]);"""
+)
 
-content = content.replace(old_reviews_state, new_reviews_state)
-
-# ─── 4. Add filtered load functions after loadReviews ────────────────────────
-old_load_reviews_end = """    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
-    finally { setReviewLoading(false); }
-  }, [user]);"""
-
-new_load_reviews_end = """    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
+# CHANGE 5: Add load functions after loadReviews
+old_rev_end = """    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
     finally { setReviewLoading(false); }
   }, [user]);
 
-  // Load rankings for a specific keyword (used in expanded panel)
+  // ─── Load Competitors ────────────────────────────────────────────────────"""
+new_rev_end = """    } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
+    finally { setReviewLoading(false); }
+  }, [user]);
+
+  // Load rankings for a specific keyword (inline panel)
   const loadRankingsForKeyword = useCallback(async (kw: string) => {
     try {
       const baseUrl = await getMcUrl();
@@ -65,7 +71,7 @@ new_load_reviews_end = """    } catch (e: any) { setMsg({ type: 'error', text: e
     } catch (_) { setKwRankings([]); }
   }, []);
 
-  // Load mentions (all, filtered in-memory by keyword)
+  // Load mentions filtered by keyword
   const loadMentionsForKeyword = useCallback(async (kw: string) => {
     try {
       const baseUrl = await getMcUrl();
@@ -79,7 +85,7 @@ new_load_reviews_end = """    } catch (e: any) { setMsg({ type: 'error', text: e
     } catch (_) { setKwMentions([]); }
   }, []);
 
-  // Load reviews (all, filtered in-memory by keyword)
+  // Load reviews filtered by keyword
   const loadReviewsForKeyword = useCallback(async (kw: string) => {
     try {
       const baseUrl = await getMcUrl();
@@ -91,11 +97,12 @@ new_load_reviews_end = """    } catch (e: any) { setMsg({ type: 'error', text: e
         r.platform.toLowerCase().includes(kw.toLowerCase())
       ));
     } catch (_) { setKwReviews([]); }
-  }, []);"""
+  }, []);
 
-content = content.replace(old_load_reviews_end, new_load_reviews_end)
+  // ─── Load Competitors ────────────────────────────────────────────────────"""
+content = content.replace(old_rev_end, new_rev_end)
 
-# ─── 5. Fix TABS — only Keywords tab remains ─────────────────────────────────
+# CHANGE 6: Only Keywords tab
 content = content.replace(
     """  const TABS = [
     { key: 'keywords',    label: 'Keywords',      icon: <Search size={14} /> },
@@ -109,7 +116,7 @@ content = content.replace(
   ] as const;"""
 )
 
-# ─── 6. Fix tab badge counts (remove ranks/mentions/reviews badges) ───────────
+# CHANGE 7: Remove extra tab badges
 content = content.replace(
     """              {t.key === 'keywords' && keywords.length > 0 && (
                 <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '1px 6px', fontSize: 11 }}>{keywords.length}</span>
@@ -125,18 +132,21 @@ content = content.replace(
               )}"""
 )
 
-# ─── 7. Add "Details" button to each keyword row ────────────────────────────
+# CHANGE 8: Add Details button + expanded panel inside keyword row div
+# The keyword row div closes at line 641 with </div> at 18 spaces.
+# We insert Details button and expanded panel BEFORE that closing </div>.
+# The keyword row wrapper div is the outer element returned by the map callback.
 old_kw_row_end = """                    <button onClick={() => deleteKeyword(kw.id)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: 8, color: '#ef4444', cursor: 'pointer' }}>
                       <Trash2 size={13} />
                     </button>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}"""
-
-new_kw_row_end = """                    <button
+            )}"""
+new_kw_row_end = """                    <button onClick={() => deleteKeyword(kw.id)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: 8, color: '#ef4444', cursor: 'pointer' }}>
+                      <Trash2 size={13} />
+                    </button>
+                    <button
                       onClick={() => {
                         if (expandedKwId === kw.id) { setExpandedKwId(null); return; }
                         setExpandedKwId(kw.id);
@@ -153,17 +163,12 @@ new_kw_row_end = """                    <button
                       <ChevronDown size={13} style={{ transform: expandedKwId === kw.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                       {expandedKwId === kw.id ? 'Hide' : 'Details'}
                     </button>
-                    <button onClick={() => deleteKeyword(kw.id)} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 8, padding: 8, color: '#ef4444', cursor: 'pointer' }}>
-                      <Trash2 size={13} />
-                    </button>
                   </div>
-                  {/* Expanded panel: all SEO data for this keyword */}
                   {expandedKwId === kw.id && (
                     <div style={{ marginTop: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '16px 20px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                        {/* Rankings */}
                         <div>
-                          <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 8, fontWeight: 600 }}>📈 Rankings for "{kw.keyword}"</div>
+                          <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 8, fontWeight: 600 }}>Rankings for "{kw.keyword}"</div>
                           {kwRankings.length === 0 ? (
                             <div style={{ fontSize: 11, color: '#4b5563' }}>No ranking history. Click "Check" on this keyword to fetch.</div>
                           ) : (
@@ -175,18 +180,17 @@ new_kw_row_end = """                    <button
                                     r.position <= 3 ? <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', borderRadius: 3, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>#{r.position}</span>
                                     : r.position <= 10 ? <span style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', borderRadius: 3, padding: '1px 6px', fontSize: 10, fontWeight: 600 }}>#{r.position}</span>
                                     : <span style={{ background: 'rgba(107,114,128,0.15)', color: '#9ca3af', borderRadius: 3, padding: '1px 6px', fontSize: 10 }}>#{r.position}</span>
-                                  ) : <span style={{ color: '#4b5563', fontSize: 10 }}>–</span>}
+                                  ) : <span style={{ color: '#4b5563', fontSize: 10 }}>--</span>}
                                   <span style={{ fontSize: 10, color: '#6b7280' }}>{r.search_engine}</span>
                                 </div>
                               ))}
                             </div>
                           )}
                         </div>
-                        {/* Mentions */}
                         <div>
-                          <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 8, fontWeight: 600 }}>📰 Mentions containing "{kw.keyword}"</div>
+                          <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 8, fontWeight: 600 }}>Mentions for "{kw.keyword}"</div>
                           {kwMentions.length === 0 ? (
-                            <div style={{ fontSize: 11, color: '#4b5563' }}>No mentions found. Run "Find Mentions" from Monitor nav.</div>
+                            <div style={{ fontSize: 11, color: '#4b5563' }}>No mentions yet. Run "Find Mentions" from Monitor nav.</div>
                           ) : (
                             <div style={{ display: 'grid', gap: 4 }}>
                               {kwMentions.slice(0, 5).map((m, i) => (
@@ -199,9 +203,8 @@ new_kw_row_end = """                    <button
                             </div>
                           )}
                         </div>
-                        {/* Reviews */}
                         <div>
-                          <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 8, fontWeight: 600 }}>⭐ Reviews for "{kw.keyword}"</div>
+                          <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 8, fontWeight: 600 }}>Reviews for "{kw.keyword}"</div>
                           {kwReviews.length === 0 ? (
                             <div style={{ fontSize: 11, color: '#4b5563' }}>No reviews yet. Run "Check Reviews" from Monitor nav.</div>
                           ) : (
@@ -211,7 +214,7 @@ new_kw_row_end = """                    <button
                                   <Star size={10} style={{ color: '#f59e0b' }} />
                                   <span style={{ fontSize: 11, color: '#e5e7eb' }}>{r.rating ?? '?'}/5</span>
                                   <span style={{ fontSize: 10, color: '#6b7280', textTransform: 'capitalize' }}>{r.platform}</span>
-                                  {r.reviewer_name && <span style={{ fontSize: 10, color: '#4b5563' }}>· {r.reviewer_name}</span>}
+                                  {r.reviewer_name && <span style={{ fontSize: 10, color: '#4b5563' }}> by {r.reviewer_name}</span>}
                                 </div>
                               ))}
                             </div>
@@ -220,46 +223,38 @@ new_kw_row_end = """                    <button
                       </div>
                     </div>
                   )}
-                </div>
-                ))}"""
-
+                ))}
+              </div>
+            )}"""
 content = content.replace(old_kw_row_end, new_kw_row_end)
 
-# ─── 8. Remove old Rankings, Mentions, Reviews, Competitors tab sections ─────
-# The old sections start with: {/* ── RANKINGS ── */}
-old_rankings_section_start = """{/* ── RANKINGS ──────────────────────────────────────────────────────── */}
-        {tab === 'rankings' && ("""
-
-new_rankings_section_start = """{/* ── RANKINGS (now inline in keyword Details) ────────────────────── */}
+# CHANGE 9: Disable old Rankings/Mentions/Reviews/Competitors tab sections
+content = content.replace(
+    """{/* ── RANKINGS ──────────────────────────────────────────────────────── */}
+        {tab === 'rankings' && (""",
+    """{/* ── RANKINGS (now inline in keyword Details) ────────────────────── */}
         {false && ("""
-
-content = content.replace(old_rankings_section_start, new_rankings_section_start)
-
-old_mentions_section_start = """{/* ── MENTIONS ─────────────────────────────────────────────────────── */}
-        {tab === 'mentions' && ("""
-
-new_mentions_section_start = """{/* ── MENTIONS (now inline in keyword Details) ──────────────────── */}
+)
+content = content.replace(
+    """{/* ── MENTIONS ─────────────────────────────────────────────────────── */}
+        {tab === 'mentions' && (""",
+    """{/* ── MENTIONS (now inline in keyword Details) ──────────────────── */}
         {false && ("""
-
-content = content.replace(old_mentions_section_start, new_mentions_section_start)
-
-old_reviews_section_start = """{/* ── REVIEWS ──────────────────────────────────────────────────────── */}
-        {tab === 'reviews' && ("""
-
-new_reviews_section_start = """{/* ── REVIEWS (now inline in keyword Details) ────────────────────── */}
+)
+content = content.replace(
+    """{/* ── REVIEWS ──────────────────────────────────────────────────────── */}
+        {tab === 'reviews' && (""",
+    """{/* ── REVIEWS (now inline in keyword Details) ────────────────────── */}
         {false && ("""
-
-content = content.replace(old_reviews_section_start, new_reviews_section_start)
-
-old_competitors_section_start = """{/* ── COMPETITORS ───────────────────────────────────────────────────── */}
-        {tab === 'competitors' && ("""
-
-new_competitors_section_start = """{/* ── COMPETITORS (removed - now accessible via Keywords) ──────── */}
+)
+content = content.replace(
+    """{/* ── COMPETITORS ───────────────────────────────────────────────────── */}
+        {tab === 'competitors' && (""",
+    """{/* ── COMPETITORS (now accessible via Keywords) ───────────────────── */}
         {false && ("""
-
-content = content.replace(old_competitors_section_start, new_competitors_section_start)
+)
 
 with open('app/monitor/page.tsx', 'w', encoding='utf-8') as f:
     f.write(content)
 
-print("All patches applied successfully")
+print("All changes applied OK")

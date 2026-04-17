@@ -1,7 +1,7 @@
 'use client';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Video, Twitter, Linkedin, Music, Send, ArrowRight, Users, Search } from 'lucide-react';
+import { Video, Twitter, Linkedin, Music, Send, ArrowRight, Users, Search, Globe } from 'lucide-react';
 
 const SYSTEMS = [
   {
@@ -59,6 +59,14 @@ const SYSTEMS = [
     desc: 'Keyword rankings, brand mentions, reviews & competitors',
     accent: '#f59e0b',
     route: '/monitor',
+  },
+  {
+    href: '/scrape',
+    icon: <Globe size={18} />,
+    label: 'Web Scraper',
+    desc: 'Extract emails, phones, social links from any site',
+    accent: '#7c3aed',
+    route: '/scrape',
   },
 ];
 
