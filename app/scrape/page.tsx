@@ -3,16 +3,15 @@ import { useEffect, useState } from 'react';
 import { getMcUrl } from '@/lib/mc-url';
 import {
   MapPin, Search, Globe, Download, Trash2, Loader2, CheckCircle, XCircle,
-  Clock, ChevronDown, Copy, Check, X, Zap, Phone, MapPinned, Star,
-  Filter, Wifi, Phone as PhoneIcon, Globe as GlobeIcon, Map, Zap as ZapIcon
+  Clock, ChevronDown, Copy, Check, X, Zap, Phone as PhoneIcon, MapPinned,
+  Star, Filter, Globe as GlobeIcon, Crosshair
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
 
-type ScrapeType = 'maps_pro' | 'maps' | 'keywords' | 'domain';
+type ScrapeType = 'maps_pro' | 'keywords' | 'domain';
 
 const SCRAPE_TYPES = [
-  { id: 'maps_pro' as ScrapeType, label: 'Maps Pro', icon: Zap, color: '#f97316', placeholder: 'roofing companies, pizza, restaurants...', hint: '15-30s · Up to 120 results · Apify-powered' },
-  { id: 'maps' as ScrapeType, label: 'Maps', icon: MapPin, color: '#ef4444', placeholder: 'roofing companies in new york, dentists in chicago...', hint: '30-60s · Basic Google Maps data' },
+  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · Up to 120+ results per search' },
   { id: 'keywords' as ScrapeType, label: 'Keywords', icon: Search, color: '#3b82f6', placeholder: 'CRM software, email marketing tools...', hint: 'Under 1 second · Google keyword ideas' },
   { id: 'domain' as ScrapeType, label: 'Domain', icon: Globe, color: '#22c55e', placeholder: 'https://example.com', hint: 'Instant · Meta, contacts, social links' },
 ];
@@ -50,12 +49,11 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
     setTimeout(() => setCopied(null), 1500);
   }
 
-  const typeColors: Record<string, string> = { maps_pro: '#f97316', maps: '#ef4444', keywords: '#3b82f6', domain: '#22c55e' };
+  const typeColors: Record<string, string> = { maps_pro: '#f97316', keywords: '#3b82f6', domain: '#22c55e' };
   const tc = typeColors[job.type] || '#71717a';
 
   return (
     <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', overflow: 'hidden' }}>
-      {/* Row header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', gap: '10px', cursor: 'pointer', userSelect: 'none' }} onClick={() => setOpen(v => !v)}>
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tc, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -63,14 +61,10 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
             {job.query || job.input_url || '(unnamed)'}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-            <span style={{ fontSize: '0.65rem', color: tc, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{job.type === 'maps_pro' ? 'Maps Pro' : job.type}</span>
+            <span style={{ fontSize: '0.65rem', color: tc, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{job.type === 'maps_pro' ? 'Maps' : job.type}</span>
             <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>·</span>
-            {job.status === 'done' && job.result_count > 0 && (
-              <span style={{ fontSize: '0.65rem', color: '#71717a' }}>{job.result_count} results</span>
-            )}
-            {job.status === 'done' && (!job.result_count || job.result_count === 0) && (
-              <span style={{ fontSize: '0.65rem', color: '#52525b' }}>no results</span>
-            )}
+            {job.status === 'done' && job.result_count > 0 && <span style={{ fontSize: '0.65rem', color: '#71717a' }}>{job.result_count} results</span>}
+            {job.status === 'done' && (!job.result_count || job.result_count === 0) && <span style={{ fontSize: '0.65rem', color: '#52525b' }}>no results</span>}
             {job.status === 'running' && <span style={{ fontSize: '0.65rem', color: '#60a5fa' }}>scraping...</span>}
             {job.status === 'error' && <span style={{ fontSize: '0.65rem', color: '#f87171' }}>error</span>}
             <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>·</span>
@@ -106,7 +100,6 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
           {job.status === 'done' && !job.results?.length && (
             <div style={{ padding: '20px 14px', textAlign: 'center' }}>
               <p style={{ fontSize: '0.75rem', color: '#52525b' }}>No results returned for this query.</p>
-              <p style={{ fontSize: '0.7rem', color: '#3f3f46', marginTop: '4px' }}>Try a different keyword or location.</p>
             </div>
           )}
           {job.results?.map((r: any, i: number) => <ResultCard key={i} data={r} type={job.type} onCopy={copy} copied={copied} />)}
@@ -138,7 +131,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
             {data.address && (
               <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '5px', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
                 <MapPinned size={10} style={{ color: '#52525b', flexShrink: 0, marginTop: '2px' }} />
-                <span>{data.address}{data.neighborhood ? ` · ${data.neighborhood}` : ''}</span>
+                <span>{data.address}{data.city ? `, ${data.city}` : ''}{data.state ? `, ${data.state}` : ''}</span>
               </p>
             )}
           </div>
@@ -157,32 +150,10 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
             )}
           </div>
         </div>
-        {data.hours && (
-          <p style={{ fontSize: '0.65rem', color: '#52525b', marginTop: '5px' }}>🕐 {data.hours}</p>
-        )}
+        {data.hours && <p style={{ fontSize: '0.65rem', color: '#52525b', marginTop: '5px' }}>🕐 {data.hours}</p>}
         {data.latitude && data.longitude && (
-          <p style={{ fontSize: '0.65rem', color: '#3f3f46', marginTop: '3px' }}>
-            📍 {parseFloat(data.latitude).toFixed(4)}, {parseFloat(data.longitude).toFixed(4)}
-          </p>
+          <p style={{ fontSize: '0.65rem', color: '#3f3f46', marginTop: '3px' }}>📍 {parseFloat(data.latitude).toFixed(4)}, {parseFloat(data.longitude).toFixed(4)}</p>
         )}
-      </div>
-    );
-  }
-  if (type === 'maps') {
-    return (
-      <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>{data.name}</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-              {data.rating && <span style={{ fontSize: '0.72rem', color: '#eab308' }}>★ {data.rating}</span>}
-              {data.reviews && <span style={{ fontSize: '0.72rem', color: '#71717a' }}>({data.reviews} reviews)</span>}
-            </div>
-            {data.address && <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPinned size={9} style={{ color: '#52525b' }} />{data.address}</p>}
-          </div>
-          {data.phone && <button onClick={() => onCopy(data.phone, `phone-${data.name}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#52525b' }}>{copied === `phone-${data.name}` ? <Check size={11} style={{ color: '#4ade80' }} /> : <PhoneIcon size={11} />}</button>}
-        </div>
-        {data.phone && <p style={{ fontSize: '0.72rem', color: '#d4d4d8', marginTop: '4px' }}>{data.phone}</p>}
       </div>
     );
   }
@@ -214,14 +185,17 @@ export default function ScrapePage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [deleting, setDeleting] = useState<string | null>(null);
   const [credits, setCredits] = useState<{ balance: number; total_used: number } | null>(null);
   const active = SCRAPE_TYPES.find(t => t.id === tab)!;
 
-  // Maps Pro filters
+  // Maps filters
   const [minRating, setMinRating] = useState(0);
   const [hasPhone, setHasPhone] = useState(false);
   const [hasWebsite, setHasWebsite] = useState(false);
+  const [location, setLocation] = useState('');
+  const [radius, setRadius] = useState(20);
+  const [searchMode, setSearchMode] = useState('search');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   async function loadJobs() {
     try {
@@ -251,7 +225,7 @@ export default function ScrapePage() {
     e.preventDefault();
     if (!input.trim()) return;
     if (tab === 'maps_pro' && credits !== null && credits.balance <= 0) {
-      setError('No search credits remaining. Contact support to add more.');
+      setError('No places remaining. Contact support to add more.');
       return;
     }
     setLoading(true);
@@ -259,26 +233,22 @@ export default function ScrapePage() {
     try {
       const body: any = { type: tab };
       if (tab === 'domain') body.input_url = input;
-      else body.query = tab === 'maps_pro' ? input : input;
-      body.max_results = tab === 'maps_pro' ? (maxResults > 120 ? 120 : maxResults) : maxResults;
+      else body.query = input;
+      body.max_results = tab === 'maps_pro' ? Math.min(maxResults, 120) : maxResults;
+
+      if (tab === 'maps_pro') {
+        body.location = location;
+        body.locationRadius = radius;
+        body.searchMode = searchMode;
+        body.onlyWithWebsite = hasWebsite;
+      }
+
       const baseUrl = await getMcUrl();
       const res = await fetch(`${baseUrl}/api/scrape/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch { throw new Error('Server error — try again.'); }
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-      // For maps_pro, results come back immediately
-      if (tab === 'maps_pro') {
-        // Apply client-side filters to results if any
-        let results = data.results || [];
-        if (minRating > 0) results = results.filter((r: any) => parseFloat(r.rating || '0') >= minRating);
-        if (hasPhone) results = results.filter((r: any) => r.phone && r.phone.trim() !== '');
-        if (hasWebsite) results = results.filter((r: any) => r.website && r.website.trim() !== '');
-        // Update job with filtered results
-        if (results.length !== (data.results || []).length) {
-          data.result_count = results.length;
-        }
-      }
       setInput('');
       await loadJobs();
       await loadCredits();
@@ -290,17 +260,15 @@ export default function ScrapePage() {
   }
 
   async function handleDelete(id: string) {
-    setDeleting(id);
     try {
       const baseUrl = await getMcUrl();
       await fetch(`${baseUrl}/api/scrape/jobs/${id}`, { method: 'DELETE' });
       setJobs(prev => prev.filter(j => j.id !== id));
-    } finally {
-      setDeleting(null);
-    }
+    } catch { /* silent */ }
   }
 
   const running = jobs.filter(j => j.status === 'running').length;
+  const activeTab = tab === 'maps_pro';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000', color: 'white' }}>
@@ -311,7 +279,7 @@ export default function ScrapePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
           <div>
             <h1 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'white' }}>Scraping Suite</h1>
-            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps Pro · Keywords · Domain</p>
+            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps · Keywords · Domain</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
             {running > 0 && (
@@ -320,11 +288,11 @@ export default function ScrapePage() {
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#60a5fa' }}>{running} running</span>
               </div>
             )}
-            {credits !== null && tab === 'maps_pro' && (
+            {credits !== null && (
               <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '4px 10px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Credits: </span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: credits.balance > 0 ? '#4ade80' : '#f87171' }}>{credits.balance}</span>
-                <span style={{ fontSize: '0.65rem', color: '#3f3f46' }}> / {credits.total_used} used</span>
+                <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Places: </span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: credits.balance > 0 ? '#4ade80' : '#f87171' }}>{credits.balance.toLocaleString()}</span>
+                <span style={{ fontSize: '0.65rem', color: '#3f3f46' }}> left</span>
               </div>
             )}
           </div>
@@ -349,72 +317,99 @@ export default function ScrapePage() {
         <form onSubmit={handleScrape} style={{ marginBottom: '28px' }}>
           <div style={{ backgroundColor: '#18181b', borderRadius: '16px', border: '1px solid #27272a', padding: '18px' }}>
 
-            {/* Maps Pro: keyword search */}
-            {tab === 'maps_pro' && (
-              <div style={{ marginBottom: '14px' }}>
+            {/* Maps: keyword */}
+            {activeTab && (
+              <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: '#71717a', marginBottom: '6px', fontWeight: 500 }}>
                   What are you looking for?
                 </label>
-                <input
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  placeholder={active.placeholder}
+                <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder={active.placeholder}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleScrape(e); } }}
                   style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
                   onFocus={e => e.target.style.borderColor = '#3f3f46'}
-                  onBlur={e => e.target.style.borderColor = '#27272a'}
-                />
+                  onBlur={e => e.target.style.borderColor = '#27272a'} />
               </div>
             )}
 
-            {/* Other tabs: textarea */}
-            {tab !== 'maps_pro' && (
-              <textarea
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                placeholder={active.placeholder}
-                rows={2}
+            {/* Non-Maps: textarea */}
+            {!activeTab && (
+              <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={active.placeholder} rows={2}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleScrape(e); } }}
                 style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '0.875rem', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5 }}
                 onFocus={e => e.target.style.borderColor = '#3f3f46'}
-                onBlur={e => e.target.style.borderColor = '#27272a'}
-              />
+                onBlur={e => e.target.style.borderColor = '#27272a'} />
             )}
 
-            {/* Maps Pro: Filters */}
-            {tab === 'maps_pro' && (
-              <div style={{ marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#71717a', cursor: 'pointer' }}>
+            {/* Maps: Filters toggle */}
+            {activeTab && (
+              <div style={{ marginBottom: '12px' }}>
+                <button type="button" onClick={() => setFiltersOpen(v => !v)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: filtersOpen ? '#f97316' : '#71717a', fontSize: '0.72rem', fontWeight: 500, padding: '0' }}>
                   <Filter size={11} />
-                  Filters (applied after results return)
-                </label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', color: '#a1a1aa', cursor: 'pointer', backgroundColor: '#09090b', border: '1px solid #27272a', padding: '5px 10px', borderRadius: '8px' }}>
-                    <Star size={10} style={{ color: '#eab308' }} />
-                    <span>Min ★</span>
-                    <select value={minRating} onChange={e => setMinRating(Number(e.target.value))}
-                      onClick={e => e.stopPropagation()}
-                      style={{ backgroundColor: 'transparent', border: 'none', color: '#e4e4e7', fontSize: '0.7rem', cursor: 'pointer', outline: 'none' }}>
-                      {[0, 3, 3.5, 4, 4.5].map(n => <option key={n} value={n}>{n === 0 ? 'Any' : n + '+'}</option>)}
-                    </select>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', color: hasPhone ? '#4ade80' : '#a1a1aa', cursor: 'pointer', backgroundColor: hasPhone ? '#14532d' : '#09090b', border: '1px solid ' + (hasPhone ? '#166534' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
-                    <input type="checkbox" checked={hasPhone} onChange={e => setHasPhone(e.target.checked)} style={{ display: 'none' }} />
-                    <PhoneIcon size={10} />
-                    Has phone
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', color: hasWebsite ? '#4ade80' : '#a1a1aa', cursor: 'pointer', backgroundColor: hasWebsite ? '#14532d' : '#09090b', border: '1px solid ' + (hasWebsite ? '#166534' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
-                    <input type="checkbox" checked={hasWebsite} onChange={e => setHasWebsite(e.target.checked)} style={{ display: 'none' }} />
-                    <GlobeIcon size={10} />
-                    Has website
-                  </label>
-                </div>
+                  {filtersOpen ? 'Hide filters' : 'Show filters'}
+                </button>
+
+                {filtersOpen && (
+                  <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Location + Radius in one row */}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ flex: 2 }}>
+                        <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Location</label>
+                        <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Chicago, IL"
+                          style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                          onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                          onBlur={e => e.target.style.borderColor = '#27272a'} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Radius (km)</label>
+                        <select value={radius} onChange={e => setRadius(Number(e.target.value))}
+                          style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 8px', color: '#a1a1aa', fontSize: '0.75rem', cursor: 'pointer', outline: 'none' }}>
+                          {[5, 10, 20, 30, 50, 75, 100].map(n => <option key={n} value={n}>{n} km</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Search mode */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Search mode</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {['search', 'maps', 'reviews'].map(mode => (
+                          <button key={mode} type="button" onClick={() => setSearchMode(mode)}
+                            style={{ flex: 1, padding: '6px 8px', borderRadius: '7px', fontSize: '0.7rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
+                              borderColor: searchMode === mode ? '#f97316' : '#27272a',
+                              backgroundColor: searchMode === mode ? '#7c2d12' : '#09090b',
+                              color: searchMode === mode ? '#f97316' : '#71717a' }}>
+                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Checkboxes */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', cursor: 'pointer', color: hasWebsite ? '#4ade80' : '#a1a1aa', backgroundColor: hasWebsite ? '#14532d' : '#09090b', border: '1px solid ' + (hasWebsite ? '#166534' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
+                        <input type="checkbox" checked={hasWebsite} onChange={e => setHasWebsite(e.target.checked)} style={{ display: 'none' }} />
+                        <GlobeIcon size={10} />Has website
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', cursor: 'pointer', color: minRating > 0 ? '#eab308' : '#a1a1aa', backgroundColor: minRating > 0 ? '#713f12' : '#09090b', border: '1px solid ' + (minRating > 0 ? '#854d0e' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
+                        <Star size={10} style={{ color: '#eab308' }} />Min ★
+                        <select value={minRating} onChange={e => setMinRating(Number(e.target.value))} onClick={e => e.stopPropagation()}
+                          style={{ backgroundColor: 'transparent', border: 'none', color: '#e4e4e7', fontSize: '0.7rem', cursor: 'pointer', outline: 'none' }}>
+                          {[0, 3, 3.5, 4, 4.5].map(n => <option key={n} value={n}>{n === 0 ? 'Any' : n + '+'}</option>)}
+                        </select>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', cursor: 'pointer', color: hasPhone ? '#4ade80' : '#a1a1aa', backgroundColor: hasPhone ? '#14532d' : '#09090b', border: '1px solid ' + (hasPhone ? '#166534' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
+                        <input type="checkbox" checked={hasPhone} onChange={e => setHasPhone(e.target.checked)} style={{ display: 'none' }} />
+                        <PhoneIcon size={10} />Has phone
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Bottom row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: activeTab && filtersOpen ? '0' : '14px' }}>
               <p style={{ flex: 1, fontSize: '0.72rem', color: '#71717a' }}>{active.hint}</p>
               {tab !== 'maps_pro' && (
                 <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
@@ -424,7 +419,7 @@ export default function ScrapePage() {
               )}
               {tab === 'maps_pro' && (
                 <span style={{ fontSize: '0.65rem', color: '#52525b', backgroundColor: '#09090b', border: '1px solid #27272a', padding: '5px 10px', borderRadius: '8px' }}>
-                  Max {maxResults} results
+                  Max {Math.min(maxResults, 120)} results
                 </span>
               )}
               <button type="submit" disabled={loading || !input.trim()}
