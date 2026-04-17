@@ -16,17 +16,9 @@ const SCRAPE_TYPES = [
   { id: 'domain' as ScrapeType, label: 'Domain', icon: Globe, color: '#22c55e', placeholder: 'https://example.com', hint: 'Scrape a URL for contact info & meta' },
 ];
 
-const STATUS_CONFIG: Record<string, { color: string; icon: any }> = {
-  pending: { color: '#9ca3af', icon: Clock },
-  running: { color: '#3b82f6', icon: Loader2 },
-  done: { color: '#22c55e', icon: CheckCircle },
-  error: { color: '#ef4444', icon: XCircle },
-};
-
 function DownloadBtn({ job }: { job: any }) {
-  if (job.status !== 'done' || !job.result_count) return null;
+  if (job.status !== 'done' || !job.results?.length) return null;
   function download() {
-    if (!job.results?.length) return;
     const headers = Object.keys(job.results[0]);
     const csv = [headers.join(','), ...job.results.map((row: any) =>
       headers.map(h => { const v = String(row[h] ?? ''); return v.includes(',') ? `"${v}"` : v; }).join(',')
@@ -34,8 +26,8 @@ function DownloadBtn({ job }: { job: any }) {
     saveAs(new Blob([csv], { type: 'text/csv' }), `${job.type}_${job.id.slice(0, 8)}.csv`);
   }
   return (
-    <button onClick={download} className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-0.5 rounded transition">
-      <Download size={11} /> CSV
+    <button onClick={download} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#4ade80', background: 'none', border: '1px solid #166534', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer' }}>
+      <Download size={10} /> CSV
     </button>
   );
 }
@@ -43,8 +35,14 @@ function DownloadBtn({ job }: { job: any }) {
 function JobCard({ job, onDelete }: { job: any; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const cfg = STATUS_CONFIG[job.status] || STATUS_CONFIG.pending;
-  const StatusIcon = cfg.icon;
+
+  const statusConfig: Record<string, { color: string; bg: string }> = {
+    pending: { color: '#9ca3af', bg: '#27272a' },
+    running: { color: '#60a5fa', bg: '#1e3a5f' },
+    done: { color: '#4ade80', bg: '#14532d' },
+    error: { color: '#f87171', bg: '#7f1d1d' },
+  };
+  const cfg = statusConfig[job.status] || statusConfig.pending;
 
   function copy(text: string, key: string) {
     navigator.clipboard.writeText(text);
@@ -53,39 +51,57 @@ function JobCard({ job, onDelete }: { job: any; onDelete: (id: string) => void }
   }
 
   return (
-    <div className="bg-[#18181b] rounded-xl border border-[#27272a] overflow-hidden">
+    <div style={{ backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #27272a', overflow: 'hidden' }}>
+      {/* Card Header */}
       <div
-        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#1f1f23] transition"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', backgroundColor: 'transparent', borderBottom: expanded ? '1px solid #27272a' : 'none' }}
         onClick={() => setExpanded(v => !v)}
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <StatusIcon size={14} style={{ color: cfg.color }} className={job.status === 'running' ? 'animate-spin' : ''} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">{job.query || job.input_url}</p>
-            <p className="text-xs text-[#71717a]">
-              {job.type} &middot; {job.result_count || 0} results &middot; {new Date(job.created_at).toLocaleTimeString()}
-            </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+          {/* Status dot */}
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: cfg.color, flexShrink: 0, opacity: job.status === 'running' ? 0.6 : 1 }} />
+          {/* Spinner for running */}
+          {job.status === 'running' && <Loader2 size={13} style={{ color: '#60a5fa', animation: 'spin 1s linear infinite', flexShrink: 0 }} />}
+          {job.status === 'done' && <CheckCircle size={13} style={{ color: '#4ade80', flexShrink: 0 }} />}
+          {job.status === 'error' && <XCircle size={13} style={{ color: '#f87171', flexShrink: 0 }} />}
+          {job.status === 'pending' && <Clock size={13} style={{ color: '#9ca3af', flexShrink: 0 }} />}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: '0.875rem', fontWeight: 500, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.query || job.input_url}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <span style={{ fontSize: '0.7rem', color: '#71717a', textTransform: 'uppercase', fontWeight: 600 }}>{job.type}</span>
+              <span style={{ fontSize: '0.7rem', color: '#52525b' }}>·</span>
+              <span style={{ fontSize: '0.7rem', color: '#71717a' }}>{job.result_count || 0} results</span>
+              <span style={{ fontSize: '0.7rem', color: '#52525b' }}>·</span>
+              <span style={{ fontSize: '0.7rem', color: '#71717a' }}>{job.status}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <DownloadBtn job={job} />
-          <button onClick={(e) => { e.stopPropagation(); onDelete(job.id); }} className="text-[#52525b] hover:text-red-400 transition p-1">
+          <button onClick={(e) => { e.stopPropagation(); onDelete(job.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#52525b' }}>
             <Trash2 size={13} />
           </button>
-          <ChevronDown size={14} style={{ color: '#52525b' }} className={`transition ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown size={13} style={{ color: '#52525b', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         </div>
       </div>
 
+      {/* Expanded Results */}
       {expanded && (
-        <div className="border-t border-[#27272a]">
+        <div style={{ borderTop: '1px solid #27272a', maxHeight: '400px', overflowY: 'auto' }}>
           {job.status === 'error' && (
-            <div className="px-4 pt-3"><p className="text-red-400 text-xs">{job.error}</p></div>
+            <div style={{ padding: '12px 16px' }}><p style={{ color: '#f87171', fontSize: '0.75rem' }}>{job.error}</p></div>
+          )}
+          {job.status === 'done' && !job.results?.length && (
+            <div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: '#52525b', fontSize: '0.8rem' }}>No results returned</p></div>
           )}
           {job.status === 'done' && job.results?.map((r: any, i: number) => (
             <ResultRow key={i} data={r} type={job.type} onCopy={copy} copied={copied} />
           ))}
-          {job.status === 'done' && !job.results?.length && (
-            <div className="px-4 py-3"><p className="text-[#52525b] text-xs">No results</p></div>
+          {job.status === 'running' && (
+            <div style={{ padding: '16px', textAlign: 'center' }}>
+              <Loader2 size={16} style={{ color: '#60a5fa', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+              <p style={{ color: '#71717a', fontSize: '0.75rem', marginTop: '8px' }}>Scraping in progress...</p>
+            </div>
           )}
         </div>
       )}
@@ -96,20 +112,20 @@ function JobCard({ job, onDelete }: { job: any; onDelete: (id: string) => void }
 function ResultRow({ data, type, onCopy, copied }: { data: any; type: string; onCopy: (v: string, k: string) => void; copied: string | null }) {
   if (type === 'maps') {
     return (
-      <div className="mx-3 my-2 bg-[#09090b] rounded-lg p-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-white leading-tight">{data.name}</p>
-          <div className="flex items-center gap-1 shrink-0">
-            {data.rating && <span style={{ color: '#eab308' }} className="text-xs">★ {data.rating}</span>}
-            {data.reviews && <span className="text-[#52525b] text-xs">({data.reviews})</span>}
+      <div style={{ margin: '8px 12px', backgroundColor: '#09090b', borderRadius: '8px', padding: '10px 12px', border: '1px solid #27272a' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+          <p style={{ fontSize: '0.8rem', fontWeight: 500, color: 'white', lineHeight: 1.3 }}>{data.name}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            {data.rating && <span style={{ color: '#eab308', fontSize: '0.7rem' }}>★ {data.rating}</span>}
+            {data.reviews && <span style={{ color: '#71717a', fontSize: '0.7rem' }}>({data.reviews})</span>}
           </div>
         </div>
-        {data.address && <p className="text-xs text-[#a1a1aa] mt-1">{data.address}</p>}
+        {data.address && <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '3px' }}>{data.address}</p>}
         {data.phone && (
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-xs text-[#d4d4d8]">{data.phone}</span>
-            <button onClick={() => onCopy(data.phone, `p${data.name}`)} className="text-[#52525b] hover:text-white transition">
-              {copied === `p${data.name}` ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+            <span style={{ fontSize: '0.72rem', color: '#d4d4d8' }}>{data.phone}</span>
+            <button onClick={() => onCopy(data.phone, `p${data.name}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#71717a' }}>
+              {copied === `p${data.name}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <Copy size={10} />}
             </button>
           </div>
         )}
@@ -118,20 +134,21 @@ function ResultRow({ data, type, onCopy, copied }: { data: any; type: string; on
   }
   if (type === 'keywords') {
     return (
-      <div className="mx-3 my-1 bg-[#09090b] rounded-md px-3 py-2 flex items-center justify-between">
-        <span className="text-sm text-[#e4e4e7]">{data.keyword}</span>
-        <button onClick={() => onCopy(data.keyword, `k${data.keyword}`)} className="text-[#52525b] hover:text-white transition">
-          {copied === `k${data.keyword}` ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+      <div style={{ margin: '4px 12px', backgroundColor: '#09090b', borderRadius: '6px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #27272a' }}>
+        <span style={{ fontSize: '0.8rem', color: '#e4e4e7' }}>{data.keyword}</span>
+        <button onClick={() => onCopy(data.keyword, `k${data.keyword}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#71717a' }}>
+          {copied === `k${data.keyword}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <Copy size={10} />}
         </button>
       </div>
     );
   }
+  // Domain
   return (
-    <div className="mx-3 my-2 bg-[#09090b] rounded-lg p-3 space-y-1">
-      {data.title && <p className="text-sm font-medium text-white">{data.title}</p>}
-      {data.url && <a href={data.url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1"><Download size={10} /> {data.url}</a>}
-      {data.description && <p className="text-xs text-[#a1a1aa]">{data.description.slice(0, 100)}</p>}
-      {data.emails?.length > 0 && <p className="text-xs text-[#d4d4d8]">✉ {data.emails.slice(0, 3).join(', ')}</p>}
+    <div style={{ margin: '8px 12px', backgroundColor: '#09090b', borderRadius: '8px', padding: '10px 12px', border: '1px solid #27272a' }}>
+      {data.title && <p style={{ fontSize: '0.8rem', fontWeight: 500, color: 'white' }}>{data.title}</p>}
+      {data.url && <a href={data.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}><Download size={9} />{data.url}</a>}
+      {data.description && <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px' }}>{data.description?.slice(0, 120)}</p>}
+      {data.emails?.length > 0 && <p style={{ fontSize: '0.72rem', color: '#d4d4d8', marginTop: '4px' }}>✉ {data.emails.slice(0, 3).join(', ')}</p>}
     </div>
   );
 }
@@ -146,12 +163,6 @@ export default function ScrapePage() {
   const active = SCRAPE_TYPES.find(t => t.id === tab)!;
   const running = jobs.filter(j => j.status === 'running').length;
 
-  useEffect(() => {
-    loadJobs();
-    const iv = setInterval(loadJobs, 5000);
-    return () => clearInterval(iv);
-  }, []);
-
   async function loadJobs() {
     try {
       const baseUrl = await getMcUrl();
@@ -163,6 +174,12 @@ export default function ScrapePage() {
       setJobs(data.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch { /* silent */ }
   }
+
+  useEffect(() => {
+    loadJobs();
+    const iv = setInterval(loadJobs, 5000);
+    return () => clearInterval(iv);
+  }, []);
 
   async function handleScrape(e: React.FormEvent) {
     e.preventDefault();
@@ -178,7 +195,7 @@ export default function ScrapePage() {
       const res = await fetch(`${baseUrl}/api/scrape/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const text = await res.text();
       let data;
-      try { data = JSON.parse(text); } catch { throw new Error('Server returned an error. Try again in a moment.'); }
+      try { data = JSON.parse(text); } catch { throw new Error('Server returned an error. Try again.'); }
       if (!res.ok) throw new Error(data.error || 'Failed to start scrape');
       setInput('');
       await loadJobs();
@@ -196,17 +213,18 @@ export default function ScrapePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-2xl mx-auto px-4 pt-10 pb-16">
+    <div style={{ minHeight: '100vh', backgroundColor: '#000', color: 'white' }}>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <div style={{ maxWidth: '672px', margin: '0 auto', padding: '40px 16px 64px' }}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Scraping Suite</h1>
             <p style={{ color: '#71717a', fontSize: '0.875rem', marginTop: '2px' }}>Google Maps, Keywords &amp; Domain data</p>
           </div>
           {running > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#3b82f6', fontSize: '0.75rem', fontWeight: 500 }}>
-              <Loader2 size={12} className="animate-spin" /> {running} running
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', fontSize: '0.75rem', fontWeight: 500, backgroundColor: '#1e3a5f', padding: '6px 12px', borderRadius: '20px' }}>
+              <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> {running} running
             </div>
           )}
         </div>
@@ -230,7 +248,6 @@ export default function ScrapePage() {
                   fontWeight: 500,
                   border: 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.15s',
                   backgroundColor: isActive ? 'white' : 'transparent',
                   color: isActive ? 'black' : '#a1a1aa',
                 }}>
@@ -242,7 +259,7 @@ export default function ScrapePage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleScrape} style={{ marginBottom: '24px' }}>
+        <form onSubmit={handleScrape} style={{ marginBottom: '32px' }}>
           <div style={{ backgroundColor: '#18181b', borderRadius: '16px', border: '1px solid #27272a', padding: '20px' }}>
             <input
               type="text"
@@ -287,12 +304,12 @@ export default function ScrapePage() {
                   backgroundColor: active.color,
                   color: 'white',
                 }}>
-                {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
+                {loading ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={15} />}
                 {loading ? 'Scraping...' : 'Scrape'}
               </button>
             </div>
             {error && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '0.75rem', marginTop: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f87171', fontSize: '0.75rem', marginTop: '12px', backgroundColor: '#7f1d1d', padding: '8px 12px', borderRadius: '8px' }}>
                 <X size={11} /> {error}
               </div>
             )}
@@ -301,7 +318,7 @@ export default function ScrapePage() {
 
         {/* Jobs */}
         <div>
-          <h2 style={{ fontSize: '0.75rem', fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Recent Jobs</h2>
+          <h2 style={{ fontSize: '0.7rem', fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Recent Jobs</h2>
           {jobs.length === 0 && (
             <div style={{ textAlign: 'center', paddingTop: '56px', paddingBottom: '56px', color: '#52525b' }}>
               <Zap size={28} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
