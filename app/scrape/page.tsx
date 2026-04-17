@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { getMcUrl } from '@/lib/mc-url';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   MapPin, Search, Globe, Download, Trash2, Loader2, CheckCircle, XCircle,
   Clock, ChevronDown, Copy, Check, X, FileSpreadsheet, Zap
@@ -35,13 +34,13 @@ function DownloadBtn({ job }: { job: any }) {
     saveAs(new Blob([csv], { type: 'text/csv' }), `${job.type}_${job.id.slice(0, 8)}.csv`);
   }
   return (
-    <button onClick={download} className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition px-2 py-1 rounded-md hover:bg-green-500/10">
-      <Download size={12} /> CSV
+    <button onClick={download} className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-0.5 rounded transition">
+      <Download size={11} /> CSV
     </button>
   );
 }
 
-function JobCard({ job }: { job: any }) {
+function JobCard({ job, onDelete }: { job: any; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const cfg = STATUS_CONFIG[job.status] || STATUS_CONFIG.pending;
@@ -54,34 +53,42 @@ function JobCard({ job }: { job: any }) {
   }
 
   return (
-    <div className="bg-[#18181b] rounded-xl border border-white/10 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/5" onClick={() => setExpanded(v => !v)}>
+    <div className="bg-[#18181b] rounded-xl border border-[#27272a] overflow-hidden">
+      <div
+        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#1f1f23] transition"
+        onClick={() => setExpanded(v => !v)}
+      >
         <div className="flex items-center gap-3 min-w-0">
-          <StatusIcon size={15} style={{ color: cfg.color }} className={job.status === 'running' ? 'animate-spin' : ''} />
+          <StatusIcon size={14} style={{ color: cfg.color }} className={job.status === 'running' ? 'animate-spin' : ''} />
           <div className="min-w-0">
             <p className="text-sm font-medium text-white truncate">{job.query || job.input_url}</p>
-            <p className="text-xs text-gray-500">{job.type} &middot; {job.result_count || 0} results &middot; {new Date(job.created_at).toLocaleTimeString()}</p>
+            <p className="text-xs text-[#71717a]">
+              {job.type} &middot; {job.result_count || 0} results &middot; {new Date(job.created_at).toLocaleTimeString()}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <DownloadBtn job={job} />
-          <ChevronDown size={14} className={`text-gray-500 transition ${expanded ? 'rotate-180' : ''}`} />
+          <button onClick={(e) => { e.stopPropagation(); onDelete(job.id); }} className="text-[#52525b] hover:text-red-400 transition p-1">
+            <Trash2 size={13} />
+          </button>
+          <ChevronDown size={14} style={{ color: '#52525b' }} className={`transition ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
-            <div className="px-4 pb-4 border-t border-white/5">
-              {job.status === 'error' && <p className="text-red-400 text-xs mt-3">{job.error}</p>}
-              {job.status === 'done' && job.results?.map((r: any, i: number) => (
-                <ResultRow key={i} data={r} type={job.type} onCopy={copy} copied={copied} />
-              ))}
-              {job.status === 'done' && !job.results?.length && <p className="text-gray-500 text-xs mt-3">No results</p>}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {expanded && (
+        <div className="border-t border-[#27272a]">
+          {job.status === 'error' && (
+            <div className="px-4 pt-3"><p className="text-red-400 text-xs">{job.error}</p></div>
+          )}
+          {job.status === 'done' && job.results?.map((r: any, i: number) => (
+            <ResultRow key={i} data={r} type={job.type} onCopy={copy} copied={copied} />
+          ))}
+          {job.status === 'done' && !job.results?.length && (
+            <div className="px-4 py-3"><p className="text-[#52525b] text-xs">No results</p></div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -89,19 +96,19 @@ function JobCard({ job }: { job: any }) {
 function ResultRow({ data, type, onCopy, copied }: { data: any; type: string; onCopy: (v: string, k: string) => void; copied: string | null }) {
   if (type === 'maps') {
     return (
-      <div className="mt-2 bg-[#0f0f12] rounded-lg p-3">
+      <div className="mx-3 my-2 bg-[#09090b] rounded-lg p-3">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-white text-sm leading-tight">{data.name}</p>
+          <p className="font-medium text-sm text-white leading-tight">{data.name}</p>
           <div className="flex items-center gap-1 shrink-0">
-            {data.rating && <span className="text-yellow-400 text-xs">★ {data.rating}</span>}
-            {data.reviews && <span className="text-gray-500 text-xs">({data.reviews})</span>}
+            {data.rating && <span style={{ color: '#eab308' }} className="text-xs">★ {data.rating}</span>}
+            {data.reviews && <span className="text-[#52525b] text-xs">({data.reviews})</span>}
           </div>
         </div>
-        {data.address && <p className="text-xs text-gray-400 mt-1">{data.address}</p>}
+        {data.address && <p className="text-xs text-[#a1a1aa] mt-1">{data.address}</p>}
         {data.phone && (
           <div className="flex items-center justify-between mt-1">
-            <span className="text-xs text-gray-300">{data.phone}</span>
-            <button onClick={() => onCopy(data.phone, `p${data.name}`)} className="text-gray-600 hover:text-white">
+            <span className="text-xs text-[#d4d4d8]">{data.phone}</span>
+            <button onClick={() => onCopy(data.phone, `p${data.name}`)} className="text-[#52525b] hover:text-white transition">
               {copied === `p${data.name}` ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
             </button>
           </div>
@@ -111,20 +118,20 @@ function ResultRow({ data, type, onCopy, copied }: { data: any; type: string; on
   }
   if (type === 'keywords') {
     return (
-      <div className="mt-1 bg-[#0f0f12] rounded-md px-3 py-2 flex items-center justify-between">
-        <span className="text-sm text-gray-200">{data.keyword}</span>
-        <button onClick={() => onCopy(data.keyword, `k${data.keyword}`)} className="text-gray-600 hover:text-white">
+      <div className="mx-3 my-1 bg-[#09090b] rounded-md px-3 py-2 flex items-center justify-between">
+        <span className="text-sm text-[#e4e4e7]">{data.keyword}</span>
+        <button onClick={() => onCopy(data.keyword, `k${data.keyword}`)} className="text-[#52525b] hover:text-white transition">
           {copied === `k${data.keyword}` ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
         </button>
       </div>
     );
   }
   return (
-    <div className="mt-2 bg-[#0f0f12] rounded-lg p-3 space-y-1">
+    <div className="mx-3 my-2 bg-[#09090b] rounded-lg p-3 space-y-1">
       {data.title && <p className="text-sm font-medium text-white">{data.title}</p>}
       {data.url && <a href={data.url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1"><Download size={10} /> {data.url}</a>}
-      {data.description && <p className="text-xs text-gray-400">{data.description.slice(0, 100)}</p>}
-      {data.emails?.length > 0 && <p className="text-xs text-gray-300">✉ {data.emails.slice(0, 3).join(', ')}</p>}
+      {data.description && <p className="text-xs text-[#a1a1aa]">{data.description.slice(0, 100)}</p>}
+      {data.emails?.length > 0 && <p className="text-xs text-[#d4d4d8]">✉ {data.emails.slice(0, 3).join(', ')}</p>}
     </div>
   );
 }
@@ -182,31 +189,45 @@ export default function ScrapePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
+    <div className="min-h-screen bg-black text-white">
       <div className="max-w-2xl mx-auto px-4 pt-10 pb-16">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-white">Scraping Suite</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Google Maps, Keywords & Domain data</p>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>Scraping Suite</h1>
+            <p style={{ color: '#71717a', fontSize: '0.875rem', marginTop: '2px' }}>Google Maps, Keywords &amp; Domain data</p>
           </div>
           {running > 0 && (
-            <div className="flex items-center gap-1.5 text-blue-400 text-xs font-medium">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#3b82f6', fontSize: '0.75rem', fontWeight: 500 }}>
               <Loader2 size={12} className="animate-spin" /> {running} running
             </div>
           )}
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1.5 mb-5 p-1 bg-[#18181b] rounded-xl border border-white/5">
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', padding: '4px', backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #27272a' }}>
           {SCRAPE_TYPES.map(t => {
             const Icon = t.icon;
+            const isActive = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition ${
-                  tab === t.id ? 'bg-white text-black' : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}>
-                <Icon size={15} style={{ color: tab === t.id ? t.color : undefined }} />
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  backgroundColor: isActive ? 'white' : 'transparent',
+                  color: isActive ? 'black' : '#a1a1aa',
+                }}>
+                <Icon size={15} style={{ color: isActive ? t.color : '#71717a' }} />
                 {t.label}
               </button>
             );
@@ -214,32 +235,57 @@ export default function ScrapePage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleScrape} className="mb-6">
-          <div className="bg-[#18181b] rounded-2xl border border-white/10 p-5">
+        <form onSubmit={handleScrape} style={{ marginBottom: '24px' }}>
+          <div style={{ backgroundColor: '#18181b', borderRadius: '16px', border: '1px solid #27272a', padding: '20px' }}>
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder={active.placeholder}
-              className="w-full bg-[#0f0f12] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white/20 text-sm mb-4"
+              style={{
+                width: '100%',
+                backgroundColor: '#09090b',
+                border: '1px solid #27272a',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                color: 'white',
+                fontSize: '0.875rem',
+                outline: 'none',
+                marginBottom: '16px',
+                boxSizing: 'border-box',
+              }}
+              onFocus={e => e.target.style.borderColor = '#3f3f46'}
+              onBlur={e => e.target.style.borderColor = '#27272a'}
             />
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs text-gray-500">{active.hint}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '0.75rem', color: '#71717a' }}>{active.hint}</p>
               </div>
               <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
-                className="bg-[#0f0f12] border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none cursor-pointer">
-                {[10,25,50,100,250,500].map(n => <option key={n} value={n}>{n} results</option>)}
+                style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '8px 12px', color: 'white', fontSize: '0.75rem', cursor: 'pointer', outline: 'none' }}>
+                {[10, 25, 50, 100, 250, 500].map(n => <option key={n} value={n}>{n} results</option>)}
               </select>
               <button type="submit" disabled={loading || !input.trim()}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium text-white transition disabled:opacity-40"
-                style={{ backgroundColor: active.color }}>
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading || !input.trim() ? 0.4 : 1,
+                  backgroundColor: active.color,
+                  color: 'white',
+                }}>
                 {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
                 {loading ? 'Scraping...' : 'Scrape'}
               </button>
             </div>
             {error && (
-              <div className="mt-3 flex items-center gap-1.5 text-red-400 text-xs">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '0.75rem', marginTop: '12px' }}>
                 <X size={11} /> {error}
               </div>
             )}
@@ -248,22 +294,16 @@ export default function ScrapePage() {
 
         {/* Jobs */}
         <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Recent Jobs</h2>
+          <h2 style={{ fontSize: '0.75rem', fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Recent Jobs</h2>
           {jobs.length === 0 && (
-            <div className="text-center py-14 text-gray-600">
-              <Zap size={28} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No scrapes yet — pick a tab and try it</p>
+            <div style={{ textAlign: 'center', paddingTop: '56px', paddingBottom: '56px', color: '#52525b' }}>
+              <Zap size={28} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+              <p style={{ fontSize: '0.875rem' }}>No scrapes yet — pick a tab and try it</p>
             </div>
           )}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {jobs.map(job => (
-              <div key={job.id} className="relative group">
-                <JobCard job={job} />
-                <button onClick={() => deleteJob(job.id)}
-                  className="absolute top-3 right-10 text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition p-1">
-                  <Trash2 size={13} />
-                </button>
-              </div>
+              <JobCard key={job.id} job={job} onDelete={deleteJob} />
             ))}
           </div>
         </div>
