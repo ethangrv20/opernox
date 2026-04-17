@@ -555,7 +555,7 @@ export default function MonitorPage() {
                   </button>
                 </div>
                 <div style={{ display: 'grid', gap: 6 }}>
-                  {gscData.keywords.slice(0, 20).map((kw: any, i: number) => (
+                  {Array.isArray(gscData.keywords) && gscData.keywords.slice(0, 20).map((kw: any, i: number) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 8 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, color: '#e5e7eb', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kw.keys?.[0]}</div>
@@ -578,7 +578,7 @@ export default function MonitorPage() {
             )}
 
             {/* GSC connected but Google hasn't indexed it yet — amber warning */}
-            {gscData?.connected && (!gscData.keywords || gscData.keywords.length === 0) && !gscLoading && (
+            {gscData?.connected && (!Array.isArray(gscData.keywords) || gscData.keywords.length === 0) && !gscLoading && (
               <div style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 14, padding: 18, marginBottom: 24, textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: '#f59e0b', marginBottom: 6 }}>Google Search Console connected — no keyword data yet</div>
                 <div style={{ fontSize: 12, color: '#6b7280' }}>Google takes 1–3 days to index a new property. Your keywords will appear here once Google has data.</div>
