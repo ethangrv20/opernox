@@ -183,10 +183,16 @@ export default function MonitorPage() {
       } catch (e: any) {
         setMsg({ type: 'error', text: e.message });
       } finally { setLoading(false); }
-      // Load GSC data in background (non-blocking)
-      loadGscData();
+      // Load GSC data after user state is set (loadGscData needs user to be non-null)
+      setUser(user);
+      setTimeout(() => loadGscData(), 0);
     })();
   }, []);
+
+  // Load GSC data whenever user changes (handles async state update timing)
+  useEffect(() => {
+    if (user) loadGscData();
+  }, [user]);
 
   // ─── Scrape Rankings ──────────────────────────────────────────────────────
   const [scrapeLoading, setScrapeLoading] = useState<string | null>(null);
