@@ -710,7 +710,7 @@ export default function MonitorPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>â³</div>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>⏳   </div>
           <p style={{ color: '#6b7280', fontSize: 14 }}>Loading monitor...</p>
         </div>
       </div>
