@@ -68,6 +68,14 @@ const SYSTEMS = [
     accent: '#7c3aed',
     route: '/scrape',
   },
+  {
+    href: '/crm',
+    icon: <Users size={18} />,
+    label: 'CRM',
+    desc: 'Contacts, companies, pipeline, activities',
+    accent: '#3b82f6',
+    route: '/crm',
+  },
 ];
 
 export default function DashboardPage() {
