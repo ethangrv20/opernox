@@ -249,7 +249,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
 export default function ScrapePage() {
   const [tab, setTab] = useState<ScrapeType>('maps_pro');
   const [input, setInput] = useState('');
-  const [maxResults, setMaxResults] = useState(50);
+  const [maxResults, setMaxResults] = useState(100);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -515,18 +515,12 @@ export default function ScrapePage() {
             {/* Bottom row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
               <p style={{ flex: 1, fontSize: '0.72rem', color: '#71717a' }}>{active.hint}</p>
-              {tab !== 'maps_pro' && (
-                <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
-                  style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: '#a1a1aa', fontSize: '0.72rem', cursor: 'pointer', outline: 'none' }}>
-                  {tab === 'leads_finder' && [10, 25, 50, 100, 250, 500].map(n => <option key={n} value={n}>{n} leads</option>)}
-                  {tab === 'search_results' && [10, 25, 50, 100].map(n => <option key={n} value={n}>{n} results</option>)}
-                </select>
-              )}
-              {tab === 'maps_pro' && (
-                <span style={{ fontSize: '0.65rem', color: '#52525b', backgroundColor: '#09090b', border: '1px solid #27272a', padding: '5px 10px', borderRadius: '8px' }}>
-                  Max {Math.min(maxResults, 120)} results
-                </span>
-              )}
+              <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
+                style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: '#a1a1aa', fontSize: '0.72rem', cursor: 'pointer', outline: 'none' }}>
+                {tab === 'maps_pro' && [10, 25, 50, 100, 200, 500].map(n => <option key={n} value={n}>{n} places</option>)}
+                {tab === 'leads_finder' && [10, 25, 50, 100, 250, 500].map(n => <option key={n} value={n}>{n} leads</option>)}
+                {tab === 'search_results' && [10, 25, 50, 100, 200, 500].map(n => <option key={n} value={n}>{n} results</option>)}
+              </select>
               <button type="submit" disabled={loading || !input.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', opacity: loading || !input.trim() ? 0.4 : 1, backgroundColor: active.color, color: 'white', whiteSpace: 'nowrap' }}>
                 {loading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
