@@ -11,9 +11,9 @@ import { saveAs } from 'file-saver';
 type ScrapeType = 'maps_pro' | 'leads_finder' | 'search_results';
 
 const SCRAPE_TYPES = [
-  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s Â· No hard cap on places' },
-  { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s Â· B2B contacts with emails & phones' },
-  { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s Â· Google organic search results' },
+  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s | No hard cap on places' },
+  { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s | B2B contacts with emails & phones' },
+  { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s | Google organic search results' },
 ];
 
 function downloadCSV(job: any) {
@@ -63,12 +63,12 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
             <span style={{ fontSize: '0.65rem', color: tc, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{job.type === 'maps_pro' ? 'Maps' : job.type === 'leads_finder' ? 'Leads' : job.type === 'search_results' ? 'Search' : job.type}</span>
-            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>Â·</span>
+            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>| </span>
             {job.status === 'done' && job.result_count > 0 && <span style={{ fontSize: '0.65rem', color: '#71717a' }}>{job.result_count} results</span>}
             {job.status === 'done' && (!job.result_count || job.result_count === 0) && <span style={{ fontSize: '0.65rem', color: '#52525b' }}>no results</span>}
             {job.status === 'running' && <span style={{ fontSize: '0.65rem', color: '#60a5fa' }}>scraping...</span>}
             {job.status === 'error' && <span style={{ fontSize: '0.65rem', color: '#f87171' }}>error</span>}
-            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>Â·</span>
+            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>| </span>
             <span style={{ fontSize: '0.65rem', color: '#52525b' }}>{new Date(job.created_at).toLocaleTimeString()}</span>
           </div>
         </div>
@@ -169,7 +169,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
             {data.company && (
               <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Building size={10} style={{ color: '#52525b' }} />
-                {data.company}{data.company_domain ? ` Â· ${data.company_domain}` : ''}
+                {data.company}{data.company_domain ? ` | ${data.company_domain}` : ''}
               </p>
             )}
             {data.location && (
@@ -363,7 +363,7 @@ export default function ScrapePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
           <div>
             <h1 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'white' }}>Scraping Suite</h1>
-            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps Â· Leads Â· Search</p>
+            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps | Leads | Search</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
             {running > 0 && (
@@ -543,7 +543,7 @@ export default function ScrapePage() {
         {/* Jobs list */}
         <div>
           <h2 style={{ fontSize: '0.7rem', fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>
-            Recent Jobs {jobs.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>Â· {jobs.length}</span>}
+            Recent Jobs {jobs.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>|  {jobs.length}</span>}
           </h2>
           {jobs.length === 0 ? (
             <div style={{ textAlign: 'center', paddingTop: '60px', paddingBottom: '60px', color: '#3f3f46' }}>
