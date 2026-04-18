@@ -372,9 +372,9 @@ export default function ScrapePage() {
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#60a5fa' }}>{running} running</span>
               </div>
             )}
-            {credits !== null && tab === 'maps_pro' && (
+            {credits !== null && (
               <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '4px 10px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Places: </span>
+                <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Credits: </span>
                 <span style={{ fontSize: '0.7rem', fontWeight: 600, color: credits.balance > 0 ? '#4ade80' : '#f87171' }}>{credits.balance.toLocaleString()}</span>
                 <span style={{ fontSize: '0.65rem', color: '#3f3f46' }}> left</span>
               </div>
@@ -515,6 +515,7 @@ export default function ScrapePage() {
             {/* Bottom row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
               <p style={{ flex: 1, fontSize: '0.72rem', color: '#71717a' }}>{active.hint}</p>
+              <p style={{ flex: 1, fontSize: '0.72rem', color: '#71717a' }}>{active.hint}</p>
               <input
                 type="number"
                 min="1"
@@ -539,6 +540,13 @@ export default function ScrapePage() {
             )}
           </div>
         </form>
+
+        {/* Credits notice */}
+        {credits !== null && (
+          <div style={{ marginBottom: '20px', padding: '10px 14px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.72rem', color: '#71717a' }}>Each scrape uses credits from your account balance. Billing for scraping will be added separately.</span>
+          </div>
+        )}
 
         {/* Jobs list */}
         <div>
