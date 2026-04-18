@@ -174,6 +174,16 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
       {data.url && <a href={data.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: '#60a5fa', textDecoration: 'none' }}>{data.url}</a>}
       {data.description && <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px' }}>{data.description?.slice(0, 150)}</p>}
       {data.emails?.length > 0 && <p style={{ fontSize: '0.72rem', color: '#d4d4d8', marginTop: '4px' }}>✉ {data.emails.slice(0, 5).join(', ')}</p>}
+      {data.phones?.length > 0 && <p style={{ fontSize: '0.72rem', color: '#d4d4d8', marginTop: '3px' }}>☎ {data.phones.slice(0, 5).join(', ')}</p>}
+      {(data.socials?.instagram || data.socials?.linkedin || data.socials?.twitter || data.socials?.facebook || data.socials?.tiktok) && (
+        <div style={{ display: 'flex', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
+          {data.socials.instagram && <span style={{ fontSize: '0.65rem', color: '#e1306c' }}>IG: @{data.socials.instagram}</span>}
+          {data.socials.linkedin && <span style={{ fontSize: '0.65rem', color: '#0077b5' }}>LI: {data.socials.linkedin}</span>}
+          {data.socials.twitter && <span style={{ fontSize: '0.65rem', color: '#1da1f2' }}>X: @{data.socials.twitter}</span>}
+          {data.socials.facebook && <span style={{ fontSize: '0.65rem', color: '#1877f2' }}>FB: {data.socials.facebook}</span>}
+          {data.socials.tiktok && <span style={{ fontSize: '0.65rem', color: '#d4d4d8' }}>TT: @{data.socials.tiktok}</span>}
+        </div>
+      )}
     </div>
   );
 }
