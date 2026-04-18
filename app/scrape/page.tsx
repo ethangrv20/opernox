@@ -11,7 +11,7 @@ import { saveAs } from 'file-saver';
 type ScrapeType = 'maps_pro' | 'leads_finder' | 'search_results';
 
 const SCRAPE_TYPES = [
-  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · Up to 120 results per search' },
+  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · Up to 500 places per search' },
   { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s · B2B contacts with emails & phones' },
   { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s · Google organic search results' },
 ];
@@ -310,7 +310,7 @@ export default function ScrapePage() {
         body.onlyWithWebsite = hasWebsite;
         body.hasPhone = hasPhone;
         body.minRating = minRating;
-        body.max_results = Math.min(maxResults, 120);
+        body.max_results = maxResults;
       } else if (tab === 'leads_finder') {
         body.query = input;
         body.location = location;
@@ -318,10 +318,10 @@ export default function ScrapePage() {
         body.job_titles = leadJobTitles;
         body.company_size = leadCompanySize;
         body.revenue = leadRevenue;
-        body.max_results = Math.min(maxResults, 500);
+        body.max_results = maxResults;
       } else if (tab === 'search_results') {
         body.query = input;
-        body.max_results = Math.min(maxResults, 100);
+        body.max_results = maxResults;
       }
 
       const baseUrl = await getMcUrl();
