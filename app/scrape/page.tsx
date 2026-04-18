@@ -193,8 +193,6 @@ export default function ScrapePage() {
   const [hasPhone, setHasPhone] = useState(false);
   const [hasWebsite, setHasWebsite] = useState(false);
   const [location, setLocation] = useState('');
-  const [radius, setRadius] = useState(20);
-  const [searchMode, setSearchMode] = useState('search');
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   async function loadJobs() {
@@ -238,8 +236,6 @@ export default function ScrapePage() {
 
       if (tab === 'maps_pro') {
         body.location = location;
-        body.locationRadius = radius;
-        body.searchMode = searchMode;
         body.onlyWithWebsite = hasWebsite;
         body.hasPhone = hasPhone;
         body.minRating = minRating;
@@ -361,29 +357,6 @@ export default function ScrapePage() {
                           style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
                           onFocus={e => e.target.style.borderColor = '#3f3f46'}
                           onBlur={e => e.target.style.borderColor = '#27272a'} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Radius (km)</label>
-                        <select value={radius} onChange={e => setRadius(Number(e.target.value))}
-                          style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 8px', color: '#a1a1aa', fontSize: '0.75rem', cursor: 'pointer', outline: 'none' }}>
-                          {[5, 10, 20, 30, 50, 75, 100].map(n => <option key={n} value={n}>{n} km</option>)}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Search mode */}
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Search mode</label>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        {['search', 'maps', 'reviews'].map(mode => (
-                          <button key={mode} type="button" onClick={() => setSearchMode(mode)}
-                            style={{ flex: 1, padding: '6px 8px', borderRadius: '7px', fontSize: '0.7rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
-                              borderColor: searchMode === mode ? '#f97316' : '#27272a',
-                              backgroundColor: searchMode === mode ? '#7c2d12' : '#09090b',
-                              color: searchMode === mode ? '#f97316' : '#71717a' }}>
-                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                          </button>
-                        ))}
                       </div>
                     </div>
 
