@@ -515,12 +515,16 @@ export default function ScrapePage() {
             {/* Bottom row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
               <p style={{ flex: 1, fontSize: '0.72rem', color: '#71717a' }}>{active.hint}</p>
-              <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
-                style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: '#a1a1aa', fontSize: '0.72rem', cursor: 'pointer', outline: 'none' }}>
-                {tab === 'maps_pro' && [10, 25, 50, 100, 200, 500].map(n => <option key={n} value={n}>{n} places</option>)}
-                {tab === 'leads_finder' && [10, 25, 50, 100, 250, 500].map(n => <option key={n} value={n}>{n} leads</option>)}
-                {tab === 'search_results' && [10, 25, 50, 100, 200, 500].map(n => <option key={n} value={n}>{n} results</option>)}
-              </select>
+              <input
+                type="number"
+                min="1"
+                value={maxResults}
+                onChange={e => setMaxResults(Number(e.target.value))}
+                placeholder="Any number"
+                style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: '#a1a1aa', fontSize: '0.72rem', outline: 'none', width: '100px', fontFamily: 'inherit' }}
+                onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                onBlur={e => e.target.style.borderColor = '#27272a' }}
+              />
               <button type="submit" disabled={loading || !input.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', opacity: loading || !input.trim() ? 0.4 : 1, backgroundColor: active.color, color: 'white', whiteSpace: 'nowrap' }}>
                 {loading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
