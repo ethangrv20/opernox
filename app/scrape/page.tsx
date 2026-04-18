@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { getMcUrl } from '@/lib/mc-url';
 import {
@@ -11,9 +11,9 @@ import { saveAs } from 'file-saver';
 type ScrapeType = 'maps_pro' | 'leads_finder' | 'search_results';
 
 const SCRAPE_TYPES = [
-  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · No hard cap on places' },
-  { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s · B2B contacts with emails & phones' },
-  { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s · Google organic search results' },
+  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s Â· No hard cap on places' },
+  { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s Â· B2B contacts with emails & phones' },
+  { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s Â· Google organic search results' },
 ];
 
 function downloadCSV(job: any) {
@@ -63,12 +63,12 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
             <span style={{ fontSize: '0.65rem', color: tc, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{job.type === 'maps_pro' ? 'Maps' : job.type === 'leads_finder' ? 'Leads' : job.type === 'search_results' ? 'Search' : job.type}</span>
-            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>·</span>
+            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>Â·</span>
             {job.status === 'done' && job.result_count > 0 && <span style={{ fontSize: '0.65rem', color: '#71717a' }}>{job.result_count} results</span>}
             {job.status === 'done' && (!job.result_count || job.result_count === 0) && <span style={{ fontSize: '0.65rem', color: '#52525b' }}>no results</span>}
             {job.status === 'running' && <span style={{ fontSize: '0.65rem', color: '#60a5fa' }}>scraping...</span>}
             {job.status === 'error' && <span style={{ fontSize: '0.65rem', color: '#f87171' }}>error</span>}
-            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>·</span>
+            <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>Â·</span>
             <span style={{ fontSize: '0.65rem', color: '#52525b' }}>{new Date(job.created_at).toLocaleTimeString()}</span>
           </div>
         </div>
@@ -95,7 +95,7 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
         <div style={{ borderTop: '1px solid #27272a', backgroundColor: '#09090b' }}>
           {job.status === 'error' && job.error && (
             <div style={{ padding: '12px 14px', borderBottom: '1px solid #27272a' }}>
-              <p style={{ fontSize: '0.72rem', color: '#f87171' }}>⚠ {job.error}</p>
+              <p style={{ fontSize: '0.72rem', color: '#f87171' }}>âš  {job.error}</p>
             </div>
           )}
           {job.status === 'done' && !job.results?.length && (
@@ -107,7 +107,7 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
           {job.status === 'running' && (
             <div style={{ padding: '24px 14px', textAlign: 'center' }}>
               <Loader2 size={18} style={{ color: '#60a5fa', animation: 'spin 1s linear infinite', margin: '0 auto 8px' }} />
-              <p style={{ fontSize: '0.75rem', color: '#71717a' }}>Scraping in progress — results appear here when done.</p>
+              <p style={{ fontSize: '0.75rem', color: '#71717a' }}>Scraping in progress â€” results appear here when done.</p>
             </div>
           )}
         </div>
@@ -124,7 +124,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>{data.name || '(no name)'}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
-              {data.rating && <span style={{ fontSize: '0.72rem', color: '#eab308' }}>★ {data.rating}</span>}
+              {data.rating && <span style={{ fontSize: '0.72rem', color: '#eab308' }}>â˜… {data.rating}</span>}
               {data.reviews && <span style={{ fontSize: '0.72rem', color: '#71717a' }}>({data.reviews} reviews)</span>}
               {data.category && <span style={{ fontSize: '0.65rem', color: '#71717a', backgroundColor: '#27272a', padding: '1px 6px', borderRadius: '4px' }}>{data.category}</span>}
               {data.priceLevel && <span style={{ fontSize: '0.65rem', color: '#a1a1aa' }}>{data.priceLevel}</span>}
@@ -151,9 +151,9 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
             )}
           </div>
         </div>
-        {data.hours && <p style={{ fontSize: '0.65rem', color: '#52525b', marginTop: '5px' }}>🕐 {data.hours}</p>}
+        {data.hours && <p style={{ fontSize: '0.65rem', color: '#52525b', marginTop: '5px' }}>ðŸ• {data.hours}</p>}
         {data.latitude && data.longitude && (
-          <p style={{ fontSize: '0.65rem', color: '#3f3f46', marginTop: '3px' }}>📍 {parseFloat(data.latitude).toFixed(4)}, {parseFloat(data.longitude).toFixed(4)}</p>
+          <p style={{ fontSize: '0.65rem', color: '#3f3f46', marginTop: '3px' }}>ðŸ“ {parseFloat(data.latitude).toFixed(4)}, {parseFloat(data.longitude).toFixed(4)}</p>
         )}
       </div>
     );
@@ -169,7 +169,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
             {data.company && (
               <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Building size={10} style={{ color: '#52525b' }} />
-                {data.company}{data.company_domain ? ` · ${data.company_domain}` : ''}
+                {data.company}{data.company_domain ? ` Â· ${data.company_domain}` : ''}
               </p>
             )}
             {data.location && (
@@ -183,7 +183,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
             {data.email && (
               <button onClick={() => onCopy(data.email, `email-${data.name}`)} style={{ background: 'none', border: '1px solid #27272a', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {copied === `email-${data.name}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <span style={{ fontSize: '0.65rem' }}>✉</span>}
+                {copied === `email-${data.name}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <span style={{ fontSize: '0.65rem' }}>âœ‰</span>}
                 <span style={{ fontSize: '0.65rem' }}>{data.email}</span>
               </button>
             )}
@@ -203,8 +203,8 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
         </div>
         {(data.company_size || data.company_revenue) && (
           <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-            {data.company_size && <span style={{ fontSize: '0.6rem', color: '#71717a' }}>👥 {data.company_size}</span>}
-            {data.company_revenue && <span style={{ fontSize: '0.6rem', color: '#71717a' }}>💰 {data.company_revenue}</span>}
+            {data.company_size && <span style={{ fontSize: '0.6rem', color: '#71717a' }}>ðŸ‘¥ {data.company_size}</span>}
+            {data.company_revenue && <span style={{ fontSize: '0.6rem', color: '#71717a' }}>ðŸ’° {data.company_revenue}</span>}
           </div>
         )}
       </div>
@@ -228,7 +228,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
               </p>
             )}
             {data.snippet && (
-              <p style={{ fontSize: '0.72rem', color: '#a1a1aa', lineHeight: 1.4 }}>{data.snippet.length > 200 ? data.snippet.slice(0, 200) + '…' : data.snippet}</p>
+              <p style={{ fontSize: '0.72rem', color: '#a1a1aa', lineHeight: 1.4 }}>{data.snippet.length > 200 ? data.snippet.slice(0, 200) + 'â€¦' : data.snippet}</p>
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flexShrink: 0 }}>
@@ -328,7 +328,7 @@ export default function ScrapePage() {
       const res = await fetch(`${baseUrl}/api/scrape/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const text = await res.text();
       let data;
-      try { data = JSON.parse(text); } catch { throw new Error('Server error — try again.'); }
+      try { data = JSON.parse(text); } catch { throw new Error('Server error â€” try again.'); }
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
       setInput('');
       await loadJobs();
@@ -363,7 +363,7 @@ export default function ScrapePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
           <div>
             <h1 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'white' }}>Scraping Suite</h1>
-            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps · Leads · Search</p>
+            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps Â· Leads Â· Search</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
             {running > 0 && (
@@ -401,7 +401,7 @@ export default function ScrapePage() {
         <form onSubmit={handleScrape} style={{ marginBottom: '28px' }}>
           <div style={{ backgroundColor: '#18181b', borderRadius: '16px', border: '1px solid #27272a', padding: '18px' }}>
 
-            {/* Main search input — all tabs use text input */}
+            {/* Main search input â€” all tabs use text input */}
             <div style={{ marginBottom: tabHasFilters ? '14px' : '0' }}>
               <input
                 type="text"
@@ -439,7 +439,7 @@ export default function ScrapePage() {
                         <GlobeIcon size={10} />Has website
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', cursor: 'pointer', color: minRating > 0 ? '#eab308' : '#a1a1aa', backgroundColor: minRating > 0 ? '#713f12' : '#09090b', border: '1px solid ' + (minRating > 0 ? '#854d0e' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
-                        <Star size={10} style={{ color: '#eab308' }} />Min ★
+                        <Star size={10} style={{ color: '#eab308' }} />Min â˜…
                         <select value={minRating} onChange={e => setMinRating(Number(e.target.value))} onClick={e => e.stopPropagation()}
                           style={{ backgroundColor: 'transparent', border: 'none', color: '#e4e4e7', fontSize: '0.7rem', cursor: 'pointer', outline: 'none' }}>
                           {[0, 3, 3.5, 4, 4.5].map(n => <option key={n} value={n}>{n === 0 ? 'Any' : n + '+'}</option>)}
@@ -523,7 +523,7 @@ export default function ScrapePage() {
                 placeholder="Any number"
                 style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: '#a1a1aa', fontSize: '0.72rem', outline: 'none', width: '100px', fontFamily: 'inherit' }}
                 onFocus={e => e.target.style.borderColor = '#3f3f46'}
-                onBlur={e => e.target.style.borderColor = '#27272a' }}
+                onBlur={e => e.target.style.borderColor = '#27272a'}
               />
               <button type="submit" disabled={loading || !input.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', opacity: loading || !input.trim() ? 0.4 : 1, backgroundColor: active.color, color: 'white', whiteSpace: 'nowrap' }}>
@@ -543,12 +543,12 @@ export default function ScrapePage() {
         {/* Jobs list */}
         <div>
           <h2 style={{ fontSize: '0.7rem', fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>
-            Recent Jobs {jobs.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· {jobs.length}</span>}
+            Recent Jobs {jobs.length > 0 && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>Â· {jobs.length}</span>}
           </h2>
           {jobs.length === 0 ? (
             <div style={{ textAlign: 'center', paddingTop: '60px', paddingBottom: '60px', color: '#3f3f46' }}>
               <MapPin size={30} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
-              <p style={{ fontSize: '0.875rem', color: '#52525b' }}>No scrapes yet — pick a tab and run one</p>
+              <p style={{ fontSize: '0.875rem', color: '#52525b' }}>No scrapes yet â€” pick a tab and run one</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
