@@ -37,10 +37,11 @@ const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = 
 // Cached MC URL — resolved once from getMcUrl()
 let _mcUrl: string | null = null;
 let _mcUrlPromise: Promise<string> | null = null;
+const MC_FALLBACK = 'https://mc.opernox.com';
 
 function resolveMcUrl() {
   if (_mcUrl) return Promise.resolve(_mcUrl);
-  if (!_mcUrlPromise) _mcUrlPromise = getMcUrl().then(u => { _mcUrl = u; return u; });
+  if (!_mcUrlPromise) _mcUrlPromise = getMcUrl().then(u => { _mcUrl = u; return u; }).catch(() => MC_FALLBACK);
   return _mcUrlPromise;
 }
 
