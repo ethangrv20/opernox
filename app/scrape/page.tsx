@@ -11,7 +11,7 @@ import { saveAs } from 'file-saver';
 type ScrapeType = 'maps_pro' | 'leads_finder' | 'search_results';
 
 const SCRAPE_TYPES = [
-  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · Up to 500 places per search' },
+  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · No hard cap on places' },
   { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s · B2B contacts with emails & phones' },
   { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s · Google organic search results' },
 ];
@@ -249,7 +249,7 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
 export default function ScrapePage() {
   const [tab, setTab] = useState<ScrapeType>('maps_pro');
   const [input, setInput] = useState('');
-  const [maxResults, setMaxResults] = useState(100);
+  const [maxResults, setMaxResults] = useState(tab === 'search_results' ? 10 : tab === 'leads_finder' ? 100 : 100);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
