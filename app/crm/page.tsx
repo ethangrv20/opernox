@@ -1,5 +1,5 @@
 ﻿'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { getMcUrl } from '@/lib/mc-url';
 import {
   Users, Building2, PieChart, Activity, CheckSquare, Plus, Search, Trash2,
@@ -34,8 +34,18 @@ const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = 
   api_import: { label: 'API Import', color: '#8b5cf6' },
 };
 
-function mcApi(endpoint: string, options?: RequestInit) {
-  const base = typeof window !== 'undefined' ? (window as any).mcUrl || 'http://localhost:3337' : 'http://localhost:3337';
+// Cached MC URL — resolved once from getMcUrl()
+let _mcUrl: string | null = null;
+let _mcUrlPromise: Promise<string> | null = null;
+
+function resolveMcUrl() {
+  if (_mcUrl) return Promise.resolve(_mcUrl);
+  if (!_mcUrlPromise) _mcUrlPromise = getMcUrl().then(u => { _mcUrl = u; return u; });
+  return _mcUrlPromise;
+}
+
+async function mcApi(endpoint: string, options?: RequestInit) {
+  const base = await resolveMcUrl();
   return fetch(`${base}${endpoint}`, { credentials: 'include', ...options });
 }
 
@@ -114,12 +124,17 @@ function ContactsTab() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', company_name: '', website: '', industry: '', source: 'manual', status: 'new', notes: '' });
 
-  function load() {
+  async function load() {
     setLoading(true);
     let url = '/api/crm/contacts?limit=100';
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
-    mcApi(url).then(r => r.json()).then(d => { setContacts(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+    try {
+      const r = await mcApi(url);
+      const d = await r.json();
+      setContacts(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
   }
 
   useEffect(() => { load(); }, [search, statusFilter]);
@@ -232,11 +247,16 @@ function CompaniesTab() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', domain: '', industry: '', size: '', website: '' });
 
-  function load() {
+  async function load() {
     setLoading(true);
     let url = '/api/crm/companies?limit=100';
     if (search) url += `&search=${encodeURIComponent(search)}`;
-    mcApi(url).then(r => r.json()).then(d => { setCompanies(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+    try {
+      const r = await mcApi(url);
+      const d = await r.json();
+      setCompanies(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
   }
 
   useEffect(() => { load(); }, [search]);
@@ -332,9 +352,14 @@ function PipelineTab() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', value: '', stage: 'lead', expected_close: '', notes: '' });
 
-  function load() {
+  async function load() {
     setLoading(true);
-    mcApi('/api/crm/deals?limit=100').then(r => r.json()).then(d => { setDeals(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+    try {
+      const r = await mcApi('/api/crm/deals?limit=100');
+      const d = await r.json();
+      setDeals(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
@@ -428,11 +453,16 @@ function ActivitiesTab() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('');
 
-  function load() {
+  async function load() {
     setLoading(true);
     let url = '/api/crm/activities?limit=100';
     if (typeFilter) url += `&type=${encodeURIComponent(typeFilter)}`;
-    mcApi(url).then(r => r.json()).then(d => { setActivities(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+    try {
+      const r = await mcApi(url);
+      const d = await r.json();
+      setActivities(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
   }
 
   useEffect(() => { load(); }, [typeFilter]);
@@ -505,13 +535,18 @@ function TasksTab() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', due_at: '', priority: 'medium' });
 
-  function load() {
+  async function load() {
     setLoading(true);
     let url = '/api/crm/tasks?limit=100';
     if (filter === 'active') url += '&completed=false';
     else if (filter === 'overdue') url += '&overdue=true';
     else if (filter === 'done') url += '&completed=true';
-    mcApi(url).then(r => r.json()).then(d => { setTasks(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+    try {
+      const r = await mcApi(url);
+      const d = await r.json();
+      setTasks(Array.isArray(d) ? d : []);
+    } catch {}
+    setLoading(false);
   }
 
   useEffect(() => { load(); }, [filter]);
