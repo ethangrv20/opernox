@@ -23,8 +23,9 @@ function downloadCSV(job: any) {
     headers.join(','),
     ...job.results.map((row: any) =>
       headers.map(h => {
-        const v = String(row[h] ?? '');
-        return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+        const v = row[h];
+        const s = (v === null || v === undefined) ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
       }).join(',')
     )
   ].join('\n');
