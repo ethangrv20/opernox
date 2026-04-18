@@ -4,16 +4,16 @@ import { getMcUrl } from '@/lib/mc-url';
 import {
   MapPin, Search, Globe, Download, Trash2, Loader2, CheckCircle, XCircle,
   Clock, ChevronDown, Copy, Check, X, Zap, Phone as PhoneIcon, MapPinned,
-  Star, Filter, Globe as GlobeIcon, Crosshair
+  Star, Filter, Globe as GlobeIcon, Crosshair, Database, User, Building, Briefcase, DollarSign, Smartphone
 } from 'lucide-react';
 import { saveAs } from 'file-saver';
 
-type ScrapeType = 'maps_pro' | 'keywords' | 'domain';
+type ScrapeType = 'maps_pro' | 'leads_finder' | 'search_results';
 
 const SCRAPE_TYPES = [
-  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · Up to 120+ results per search' },
-  { id: 'keywords' as ScrapeType, label: 'Keywords', icon: Search, color: '#3b82f6', placeholder: 'CRM software, email marketing tools...', hint: 'Under 1 second · Google keyword ideas' },
-  { id: 'domain' as ScrapeType, label: 'Domain', icon: Globe, color: '#22c55e', placeholder: 'https://example.com', hint: 'Instant · Meta, contacts, social links' },
+  { id: 'maps_pro' as ScrapeType, label: 'Maps', icon: MapPin, color: '#f97316', placeholder: 'pizza, roofing companies, dentists...', hint: '15-30s · Up to 120 results per search' },
+  { id: 'leads_finder' as ScrapeType, label: 'Leads', icon: Database, color: '#a855f7', placeholder: 'marketing managers', hint: '15-30s · B2B contacts with emails & phones' },
+  { id: 'search_results' as ScrapeType, label: 'Search', icon: Search, color: '#3b82f6', placeholder: 'best CRM software 2025', hint: '15-30s · Google organic search results' },
 ];
 
 function downloadCSV(job: any) {
@@ -50,7 +50,7 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
     setTimeout(() => setCopied(null), 1500);
   }
 
-  const typeColors: Record<string, string> = { maps_pro: '#f97316', keywords: '#3b82f6', domain: '#22c55e' };
+  const typeColors: Record<string, string> = { maps_pro: '#f97316', leads_finder: '#a855f7', search_results: '#3b82f6' };
   const tc = typeColors[job.type] || '#71717a';
 
   return (
@@ -62,7 +62,7 @@ function JobRow({ job, onDelete }: { job: any; onDelete: (id: string) => void })
             {job.query || job.input_url || '(unnamed)'}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-            <span style={{ fontSize: '0.65rem', color: tc, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{job.type === 'maps_pro' ? 'Maps' : job.type}</span>
+            <span style={{ fontSize: '0.65rem', color: tc, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{job.type === 'maps_pro' ? 'Maps' : job.type === 'leads_finder' ? 'Leads' : job.type === 'search_results' ? 'Search' : job.type}</span>
             <span style={{ color: '#3f3f46', fontSize: '0.65rem' }}>·</span>
             {job.status === 'done' && job.result_count > 0 && <span style={{ fontSize: '0.65rem', color: '#71717a' }}>{job.result_count} results</span>}
             {job.status === 'done' && (!job.result_count || job.result_count === 0) && <span style={{ fontSize: '0.65rem', color: '#52525b' }}>no results</span>}
@@ -158,41 +158,98 @@ function ResultCard({ data, type, onCopy, copied }: { data: any; type: string; o
       </div>
     );
   }
-  if (type === 'keywords') {
+
+  if (type === 'leads_finder') {
     return (
-      <div style={{ padding: '8px 14px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '0.82rem', color: '#e4e4e7' }}>{data.keyword}</span>
-        <button onClick={() => onCopy(data.keyword, `kw-${data.keyword}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#52525b' }}>
-          {copied === `kw-${data.keyword}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <Copy size={10} />}
-        </button>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a1a1a' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>{data.name || '(no name)'}</p>
+            {data.title && <p style={{ fontSize: '0.72rem', color: '#a855f7', marginTop: '2px' }}>{data.title}</p>}
+            {data.company && (
+              <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Building size={10} style={{ color: '#52525b' }} />
+                {data.company}{data.company_domain ? ` · ${data.company_domain}` : ''}
+              </p>
+            )}
+            {data.location && (
+              <p style={{ fontSize: '0.65rem', color: '#71717a', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <MapPinned size={10} style={{ color: '#52525b' }} />
+                {data.location}
+              </p>
+            )}
+            {data.industry && <span style={{ fontSize: '0.6rem', color: '#52525b', backgroundColor: '#1a1a1a', padding: '1px 6px', borderRadius: '4px', marginTop: '4px', display: 'inline-block' }}>{data.industry}</span>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+            {data.email && (
+              <button onClick={() => onCopy(data.email, `email-${data.name}`)} style={{ background: 'none', border: '1px solid #27272a', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {copied === `email-${data.name}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <span style={{ fontSize: '0.65rem' }}>✉</span>}
+                <span style={{ fontSize: '0.65rem' }}>{data.email}</span>
+              </button>
+            )}
+            {data.phone && (
+              <button onClick={() => onCopy(data.phone, `phone-${data.name}`)} style={{ background: 'none', border: '1px solid #27272a', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {copied === `phone-${data.name}` ? <Check size={10} style={{ color: '#4ade80' }} /> : <PhoneIcon size={10} />}
+                <span style={{ fontSize: '0.65rem' }}>{data.phone}</span>
+              </button>
+            )}
+            {data.linkedin_url && (
+              <a href={data.linkedin_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.65rem', color: '#0077b5', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', border: '1px solid #27272a', borderRadius: '6px' }}>
+                <span style={{ fontSize: '0.65rem' }}>in</span>
+                LinkedIn
+              </a>
+            )}
+          </div>
+        </div>
+        {(data.company_size || data.company_revenue) && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+            {data.company_size && <span style={{ fontSize: '0.6rem', color: '#71717a' }}>👥 {data.company_size}</span>}
+            {data.company_revenue && <span style={{ fontSize: '0.6rem', color: '#71717a' }}>💰 {data.company_revenue}</span>}
+          </div>
+        )}
       </div>
     );
   }
-  // Domain
-  return (
-    <div style={{ padding: '12px 14px', borderBottom: '1px solid #1a1a1a' }}>
-      {data.title && <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>{data.title}</p>}
-      {data.url && <a href={data.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: '#60a5fa', textDecoration: 'none' }}>{data.url}</a>}
-      {data.description && <p style={{ fontSize: '0.72rem', color: '#a1a1aa', marginTop: '4px' }}>{data.description?.slice(0, 150)}</p>}
-      {data.emails?.length > 0 && <p style={{ fontSize: '0.72rem', color: '#d4d4d8', marginTop: '4px' }}>✉ {data.emails.slice(0, 5).join(', ')}</p>}
-      {data.phones?.length > 0 && <p style={{ fontSize: '0.72rem', color: '#d4d4d8', marginTop: '3px' }}>☎ {data.phones.slice(0, 5).join(', ')}</p>}
-      {(data.socials?.instagram || data.socials?.linkedin || data.socials?.twitter || data.socials?.facebook || data.socials?.tiktok) && (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
-          {data.socials.instagram && <span style={{ fontSize: '0.65rem', color: '#e1306c' }}>IG: @{data.socials.instagram}</span>}
-          {data.socials.linkedin && <span style={{ fontSize: '0.65rem', color: '#0077b5' }}>LI: {data.socials.linkedin}</span>}
-          {data.socials.twitter && <span style={{ fontSize: '0.65rem', color: '#1da1f2' }}>X: @{data.socials.twitter}</span>}
-          {data.socials.facebook && <span style={{ fontSize: '0.65rem', color: '#1877f2' }}>FB: {data.socials.facebook}</span>}
-          {data.socials.tiktok && <span style={{ fontSize: '0.65rem', color: '#d4d4d8' }}>TT: @{data.socials.tiktok}</span>}
+
+  if (type === 'search_results') {
+    return (
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid #1a1a1a' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          {data.position && <span style={{ fontSize: '0.6rem', color: '#52525b', backgroundColor: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, marginTop: '2px' }}>#{data.position}</span>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {data.title && (
+              <a href={data.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.82rem', color: '#60a5fa', textDecoration: 'none', fontWeight: 500, display: 'block', marginBottom: '3px' }}>
+                {data.title}
+              </a>
+            )}
+            {data.display_url && (
+              <p style={{ fontSize: '0.65rem', color: '#4ade80', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {data.display_url}
+              </p>
+            )}
+            {data.snippet && (
+              <p style={{ fontSize: '0.72rem', color: '#a1a1aa', lineHeight: 1.4 }}>{data.snippet.length > 200 ? data.snippet.slice(0, 200) + '…' : data.snippet}</p>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flexShrink: 0 }}>
+            {data.url && (
+              <button onClick={() => onCopy(data.url, `url-${data.position}`)} style={{ background: 'none', border: '1px solid #27272a', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px', color: '#52525b' }}>
+                {copied === `url-${data.position}` ? <Check size={9} style={{ color: '#4ade80' }} /> : <Copy size={9} />}
+              </button>
+            )}
+          </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default function ScrapePage() {
   const [tab, setTab] = useState<ScrapeType>('maps_pro');
   const [input, setInput] = useState('');
-  const [maxResults, setMaxResults] = useState(120);
+  const [maxResults, setMaxResults] = useState(50);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -205,6 +262,12 @@ export default function ScrapePage() {
   const [hasWebsite, setHasWebsite] = useState(false);
   const [location, setLocation] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Leads Finder filters
+  const [leadIndustry, setLeadIndustry] = useState('');
+  const [leadJobTitles, setLeadJobTitles] = useState('');
+  const [leadCompanySize, setLeadCompanySize] = useState('');
+  const [leadRevenue, setLeadRevenue] = useState('');
 
   async function loadJobs() {
     try {
@@ -241,15 +304,24 @@ export default function ScrapePage() {
     setError('');
     try {
       const body: any = { type: tab };
-      if (tab === 'domain') body.input_url = input;
-      else body.query = input;
-      body.max_results = tab === 'maps_pro' ? Math.min(maxResults, 120) : maxResults;
-
       if (tab === 'maps_pro') {
+        body.query = input;
         body.location = location;
         body.onlyWithWebsite = hasWebsite;
         body.hasPhone = hasPhone;
         body.minRating = minRating;
+        body.max_results = Math.min(maxResults, 120);
+      } else if (tab === 'leads_finder') {
+        body.query = input;
+        body.location = location;
+        body.industry = leadIndustry;
+        body.job_titles = leadJobTitles;
+        body.company_size = leadCompanySize;
+        body.revenue = leadRevenue;
+        body.max_results = Math.min(maxResults, 500);
+      } else if (tab === 'search_results') {
+        body.query = input;
+        body.max_results = Math.min(maxResults, 100);
       }
 
       const baseUrl = await getMcUrl();
@@ -260,7 +332,7 @@ export default function ScrapePage() {
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
       setInput('');
       await loadJobs();
-      await loadCredits();
+      if (tab === 'maps_pro') await loadCredits();
     } catch (err: any) {
       setError(err.message || err.toString());
     } finally {
@@ -277,7 +349,10 @@ export default function ScrapePage() {
   }
 
   const running = jobs.filter(j => j.status === 'running').length;
-  const activeTab = tab === 'maps_pro';
+
+  const showMapsFilters = tab === 'maps_pro' && filtersOpen;
+  const showLeadsFilters = tab === 'leads_finder';
+  const tabHasFilters = tab === 'maps_pro' || tab === 'leads_finder';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000', color: 'white' }}>
@@ -288,7 +363,7 @@ export default function ScrapePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
           <div>
             <h1 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'white' }}>Scraping Suite</h1>
-            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps · Keywords · Domain</p>
+            <p style={{ color: '#71717a', fontSize: '0.85rem', marginTop: '3px' }}>Maps · Leads · Search</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
             {running > 0 && (
@@ -297,7 +372,7 @@ export default function ScrapePage() {
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#60a5fa' }}>{running} running</span>
               </div>
             )}
-            {credits !== null && (
+            {credits !== null && tab === 'maps_pro' && (
               <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '4px 10px', borderRadius: '8px' }}>
                 <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Places: </span>
                 <span style={{ fontSize: '0.7rem', fontWeight: 600, color: credits.balance > 0 ? '#4ade80' : '#f87171' }}>{credits.balance.toLocaleString()}</span>
@@ -326,52 +401,38 @@ export default function ScrapePage() {
         <form onSubmit={handleScrape} style={{ marginBottom: '28px' }}>
           <div style={{ backgroundColor: '#18181b', borderRadius: '16px', border: '1px solid #27272a', padding: '18px' }}>
 
-            {/* Maps: keyword */}
-            {activeTab && (
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: '#71717a', marginBottom: '6px', fontWeight: 500 }}>
-                  What are you looking for?
-                </label>
-                <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder={active.placeholder}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleScrape(e); } }}
-                  style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                  onFocus={e => e.target.style.borderColor = '#3f3f46'}
-                  onBlur={e => e.target.style.borderColor = '#27272a'} />
-              </div>
-            )}
-
-            {/* Non-Maps: textarea */}
-            {!activeTab && (
-              <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={active.placeholder} rows={2}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleScrape(e); } }}
-                style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '0.875rem', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5 }}
+            {/* Main search input — all tabs use text input */}
+            <div style={{ marginBottom: tabHasFilters ? '14px' : '0' }}>
+              <input
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder={active.placeholder}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleScrape(e as any); } }}
+                style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '10px', padding: '10px 14px', color: 'white', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
                 onFocus={e => e.target.style.borderColor = '#3f3f46'}
-                onBlur={e => e.target.style.borderColor = '#27272a'} />
-            )}
+                onBlur={e => e.target.style.borderColor = '#27272a'}
+              />
+            </div>
 
-            {/* Maps: Filters toggle */}
-            {activeTab && (
-              <div style={{ marginBottom: '12px' }}>
+            {/* Maps filters */}
+            {tab === 'maps_pro' && (
+              <div style={{ marginBottom: '14px' }}>
                 <button type="button" onClick={() => setFiltersOpen(v => !v)}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: filtersOpen ? '#f97316' : '#71717a', fontSize: '0.72rem', fontWeight: 500, padding: '0' }}>
                   <Filter size={11} />
                   {filtersOpen ? 'Hide filters' : 'Show filters'}
                 </button>
 
-                {filtersOpen && (
+                {showMapsFilters && (
                   <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {/* Location + Radius in one row */}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <div style={{ flex: 2 }}>
-                        <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Location</label>
-                        <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Chicago, IL"
-                          style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                          onFocus={e => e.target.style.borderColor = '#3f3f46'}
-                          onBlur={e => e.target.style.borderColor = '#27272a'} />
-                      </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>Location</label>
+                      <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Chicago, IL"
+                        style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                        onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                        onBlur={e => e.target.style.borderColor = '#27272a'} />
                     </div>
-
-                    {/* Checkboxes */}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', cursor: 'pointer', color: hasWebsite ? '#4ade80' : '#a1a1aa', backgroundColor: hasWebsite ? '#14532d' : '#09090b', border: '1px solid ' + (hasWebsite ? '#166534' : '#27272a'), padding: '5px 10px', borderRadius: '8px', transition: 'all 0.15s' }}>
                         <input type="checkbox" checked={hasWebsite} onChange={e => setHasWebsite(e.target.checked)} style={{ display: 'none' }} />
@@ -394,13 +455,71 @@ export default function ScrapePage() {
               </div>
             )}
 
+            {/* Leads Finder filters */}
+            {showLeadsFilters && (
+              <div style={{ marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Building size={9} />Industry</span>
+                    </label>
+                    <input type="text" value={leadIndustry} onChange={e => setLeadIndustry(e.target.value)} placeholder="SaaS, Fintech..."
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                      onBlur={e => e.target.style.borderColor = '#27272a'} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPinned size={9} />Location</span>
+                    </label>
+                    <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="United States, Chicago..."
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                      onBlur={e => e.target.style.borderColor = '#27272a'} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Briefcase size={9} />Job Titles</span>
+                    </label>
+                    <input type="text" value={leadJobTitles} onChange={e => setLeadJobTitles(e.target.value)} placeholder="CEO, CTO, Marketing Manager..."
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                      onBlur={e => e.target.style.borderColor = '#27272a'} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={9} />Company Size</span>
+                    </label>
+                    <input type="text" value={leadCompanySize} onChange={e => setLeadCompanySize(e.target.value)} placeholder="11-50, 51-200..."
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                      onBlur={e => e.target.style.borderColor = '#27272a'} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.65rem', color: '#52525b', marginBottom: '4px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><DollarSign size={9} />Revenue</span>
+                    </label>
+                    <input type="text" value={leadRevenue} onChange={e => setLeadRevenue(e.target.value)} placeholder="$1M-$10M, $10M-$50M..."
+                      style={{ width: '100%', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: 'white', fontSize: '0.75rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.style.borderColor = '#3f3f46'}
+                      onBlur={e => e.target.style.borderColor = '#27272a'} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Bottom row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: activeTab && filtersOpen ? '0' : '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
               <p style={{ flex: 1, fontSize: '0.72rem', color: '#71717a' }}>{active.hint}</p>
               {tab !== 'maps_pro' && (
                 <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
                   style={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', padding: '7px 10px', color: '#a1a1aa', fontSize: '0.72rem', cursor: 'pointer', outline: 'none' }}>
-                  {[10, 25, 50, 100, 250, 500].map(n => <option key={n} value={n}>{n} results</option>)}
+                  {tab === 'leads_finder' && [10, 25, 50, 100, 250, 500].map(n => <option key={n} value={n}>{n} leads</option>)}
+                  {tab === 'search_results' && [10, 25, 50, 100].map(n => <option key={n} value={n}>{n} results</option>)}
                 </select>
               )}
               {tab === 'maps_pro' && (
