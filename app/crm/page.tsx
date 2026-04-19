@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import React, { useEffect, useState, useRef } from 'react';
 import { getMcUrl } from '@/lib/mc-url';
 import {
@@ -8,7 +8,7 @@ import {
   Zap, Send, ArrowRight, Filter
 } from 'lucide-react';
 
-type Tab = 'contacts' | 'companies' | 'pipeline' | 'activities' | 'tasks';
+type Tab = 'overview' | 'contacts' | 'companies' | 'pipeline' | 'activities' | 'tasks';
 type ActivityType = 'scrape_run' | 'post_published' | 'dm_sent' | 'dm_reply' | 'contact_created' | 'deal_created' | 'deal_stage_changed' | 'note_added' | 'task_completed' | 'api_import';
 type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
@@ -34,7 +34,7 @@ const ACTIVITY_CONFIG: Record<ActivityType, { label: string; color: string }> = 
   api_import: { label: 'API Import', color: '#8b5cf6' },
 };
 
-// Cached MC URL — resolved once from getMcUrl()
+// Cached MC URL Ã¢â‚¬â€ resolved once from getMcUrl()
 let _mcUrl: string | null = null;
 let _mcUrlPromise: Promise<string> | null = null;
 const MC_FALLBACK = 'https://mc.opernox.com';
@@ -114,6 +114,199 @@ function Badge({ children, color }: { children: React.ReactNode; color: string }
   return <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: color + '22', color, fontWeight: 600 }}>{children}</span>;
 }
 
+
+// ---- OVERVIEW TAB ----
+function OverviewTab() {
+  const [stats, setStats] = useState({ contacts: 0, companies: 0, deals: 0, tasks: 0, activities: 0 });
+  const [pipelineData, setPipelineData] = useState<any[]>([]);
+  const [sourcesData, setSourcesData] = useState<any[]>([]);
+  const [activityData, setActivityData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [contacts, companies, deals, tasks, activities] = await Promise.all([
+          mcApi('/api/crm/contacts?limit=1').then(r => r.json()).catch(() => []),
+          mcApi('/api/crm/companies?limit=1').then(r => r.json()).catch(() => []),
+          mcApi('/api/crm/deals?limit=100').then(r => r.json()).catch(() => []),
+          mcApi('/api/crm/tasks?limit=1').then(r => r.json()).catch(() => []),
+          mcApi('/api/crm/activities?limit=200').then(r => r.json()).catch(() => []),
+        ]);
+        setStats({
+          contacts: Array.isArray(contacts) ? (contacts[0]?.total || contacts.length) : 0,
+          companies: Array.isArray(companies) ? (companies[0]?.total || companies.length) : 0,
+          deals: Array.isArray(deals) ? deals.length : 0,
+          tasks: Array.isArray(tasks) ? (tasks[0]?.total || tasks.length) : 0,
+          activities: Array.isArray(activities) ? activities.length : 0,
+        });
+        // Pipeline by stage
+        if (Array.isArray(deals)) {
+          const byStage: Record<string, number> = { lead: 0, qualified: 0, proposal: 0, negotiation: 0, won: 0, lost: 0 };
+          deals.forEach((d: any) => { if (byStage[d.stage] !== undefined) byStage[d.stage]++; });
+          setPipelineData(Object.entries(byStage).map(([stage, count]) => ({ stage, count })));
+        }
+        // Contact sources
+        if (Array.isArray(contacts)) {
+          const srcs: Record<string, number> = {};
+          contacts.forEach((c: any) => { const s = c.source || 'manual'; srcs[s] = (srcs[s] || 0) + 1; });
+          setSourcesData(Object.entries(srcs).map(([source, count]) => ({ source, count })));
+        }
+        // Activity trend (last 14 days)
+        if (Array.isArray(activities)) {
+          const days: string[] = [];
+          for (let i = 13; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            days.push(d.toISOString().split('T')[0]);
+          }
+          const byDay: Record<string, number> = {};
+          activities.forEach((a: any) => {
+            const day = a.created_at?.split('T')[0];
+            if (day) byDay[day] = (byDay[day] || 0) + 1;
+          });
+          setActivityData(days.map(day => ({ day, count: byDay[day] || 0 })));
+        }
+      } catch {}
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const cardStyle = { backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px', padding: '20px', flex: '1', minWidth: '140px' };
+  const statNum = { fontSize: '1.8rem', fontWeight: 700, color: 'white', marginBottom: '4px' };
+  const statLbl = { fontSize: '0.72rem', color: '#71717a', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' };
+  const sectionTitle = { fontSize: '0.82rem', fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '14px' };
+
+  // SVG chart helpers
+  function miniBarChart(data: { label: string; value: number; color: string }[], w = 280, h = 80) {
+    if (!data.length) return null;
+    const max = Math.max(...data.map(d => d.value), 1);
+    const barW = Math.max(4, (w - 20) / data.length - 4);
+    return (
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', maxWidth: w }}>
+        {data.map((d, i) => {
+          const bh = Math.max(2, (d.value / max) * (h - 20));
+          const x = 10 + i * (barW + 4);
+          const y = h - 10 - bh;
+          return <rect key={i} x={x} y={y} width={barW} height={bh} rx={2} fill={d.color} />;
+        })}
+      </svg>
+    );
+  }
+
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46' }}>
+      <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Stat cards */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Total Contacts', value: stats.contacts, icon: Users, color: '#3b82f6' },
+          { label: 'Companies', value: stats.companies, icon: Building2, color: '#8b5cf6' },
+          { label: 'Active Deals', value: stats.deals, icon: PieChart, color: '#22c55e' },
+          { label: 'Open Tasks', value: stats.tasks, icon: CheckSquare, color: '#f97316' },
+          { label: 'Activities', value: stats.activities, icon: Activity, color: '#06b6d4' },
+        ].map(s => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} style={{ ...cardStyle, position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: '-8px', right: '-8px', opacity: 0.06 }}>
+                <Icon size={64} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <Icon size={12} style={{ color: s.color }} />
+                <span style={{ fontSize: '0.65rem', color: '#71717a', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'white' }}>{typeof s.value === 'number' ? s.value.toLocaleString() : s.value}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {/* Pipeline by Stage */}
+        <div style={{ ...cardStyle, minWidth: '300px', flex: 2 }}>
+          <div style={sectionTitle}>Pipeline by Stage</div>
+          {pipelineData.length === 0 ? (
+            <div style={{ color: '#52525b', fontSize: '0.8rem', textAlign: 'center', padding: '20px' }}>No deals yet</div>
+          ) : (
+            <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-end', height: '120px' }}>
+              {pipelineData.map(d => {
+                const cfg = STAGES.find(s => s.id === d.stage) || { label: d.stage, color: '#71717a' };
+                const max = Math.max(...pipelineData.map(p => p.count), 1);
+                const barH = Math.max(4, (d.count / max) * 90);
+                return (
+                  <div key={d.stage} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'white' }}>{d.count}</span>
+                    <div style={{ width: '100%', backgroundColor: '#27272a', borderRadius: '6px', height: '90px', display: 'flex', alignItems: 'flex-end', padding: '4px' }}>
+                      <div style={{ width: '100%', height: barH, backgroundColor: cfg.color, borderRadius: '4px', transition: 'height 0.3s' }} />
+                    </div>
+                    <span style={{ fontSize: '0.62rem', color: '#71717a', textAlign: 'center' }}>{cfg.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Contact Sources */}
+        <div style={{ ...cardStyle, minWidth: '220px', flex: 1 }}>
+          <div style={sectionTitle}>Contact Sources</div>
+          {sourcesData.length === 0 ? (
+            <div style={{ color: '#52525b', fontSize: '0.8rem', textAlign: 'center', padding: '20px' }}>No contacts yet</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sourcesData.slice(0, 6).map(s => {
+                const colors = ['#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#06b6d4', '#eab308'];
+                const color = colors[sourcesData.indexOf(s) % colors.length];
+                const total = sourcesData.reduce((a: number, b: any) => a + b.count, 0);
+                const pct = Math.round((s.count / total) * 100);
+                return (
+                  <div key={s.source}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#a1a1aa', textTransform: 'capitalize' }}>{s.source}</span>
+                      <span style={{ fontSize: '0.72rem', color: '#71717a' }}>{pct}%</span>
+                    </div>
+                    <div style={{ backgroundColor: '#27272a', borderRadius: '4px', height: '6px' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Trend */}
+      <div style={{ ...cardStyle }}>
+        <div style={sectionTitle}>Activity Trend (Last 14 Days)</div>
+        {activityData.length === 0 ? (
+          <div style={{ color: '#52525b', fontSize: '0.8rem', textAlign: 'center', padding: '20px' }}>No activity yet</div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '80px' }}>
+            {activityData.map((d, i) => {
+              const max = Math.max(...activityData.map(a => a.count), 1);
+              const h = Math.max(3, (d.count / max) * 70);
+              const dayLabel = d.day.split('-')[2];
+              const show = i % 2 === 0;
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}>
+                  <div style={{ width: '100%', backgroundColor: '#27272a', borderRadius: '3px', height: `${h}px`, transition: 'height 0.3s', minHeight: '3px' }} />
+                  {show && <span style={{ fontSize: '0.58rem', color: '#52525b' }}>{dayLabel}</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 // ---- CONTACTS TAB ----
 function ContactsTab() {
   const [contacts, setContacts] = useState<any[]>([]);
@@ -184,7 +377,7 @@ function ContactsTab() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
       ) : contacts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46', fontSize: '0.85rem' }}>No contacts yet â€” add your first one above.</div>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46', fontSize: '0.85rem' }}>No contacts yet ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â add your first one above.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {contacts.map(c => (
@@ -298,7 +491,7 @@ function CompaniesTab() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46' }}><Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
       ) : companies.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46', fontSize: '0.85rem' }}>No companies yet â€” add your first one above.</div>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#3f3f46', fontSize: '0.85rem' }}>No companies yet ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â add your first one above.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {companies.map(c => (
@@ -432,7 +625,7 @@ function PipelineTab() {
       )}
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title="New Deal">
-        <Field label="Deal Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Acme Corp â€” $50k contract" /></Field>
+        <Field label="Deal Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Acme Corp ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â $50k contract" /></Field>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Field label="Value ($)"><Input value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="50000" type="number" /></Field>
           <Field label="Stage"><Sel value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })} options={STAGES.map(s => ({ value: s.id, label: s.label }))} /></Field>
@@ -513,7 +706,7 @@ function ActivitiesTab() {
                   </div>
                   {a.details && Object.keys(a.details).length > 0 && (
                     <div style={{ fontSize: '0.72rem', color: '#52525b', marginTop: '2px' }}>
-                      {a.actor && <span style={{ textTransform: 'capitalize' }}>by {a.actor} Â· </span>}
+                      {a.actor && <span style={{ textTransform: 'capitalize' }}>by {a.actor} Ãƒâ€šÃ‚Â· </span>}
                       {a.created_at && timeAgo(a.created_at)}
                     </div>
                   )}
@@ -650,7 +843,7 @@ export default function CrmPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '28px' }}>
         <div>
           <h1 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'white' }}>CRM</h1>
-          <p style={{ color: '#71717a', fontSize: '0.8rem', marginTop: '2px' }}>Contacts Â· Companies Â· Pipeline Â· Activities Â· Tasks</p>
+          <p style={{ color: '#71717a', fontSize: '0.8rem', marginTop: '2px' }}>Contacts Ãƒâ€šÃ‚Â· Companies Ãƒâ€šÃ‚Â· Pipeline Ãƒâ€šÃ‚Â· Activities Ãƒâ€šÃ‚Â· Tasks</p>
         </div>
       </div>
 
